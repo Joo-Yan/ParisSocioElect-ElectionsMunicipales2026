@@ -945,16 +945,21 @@ function initScatter(data) {
     x: +f.properties[xMeta.field],
     y: +f.properties[yMeta.field]
   }));
-  const reg = ols(pts);
-  const x1 = 0, x2 = xMax;
-  const y1 = reg.a + reg.b * x1;
-  const y2 = reg.a + reg.b * x2;
+  const r2 = pearsonR(pts) ** 2;
+  const r  = pearsonR(pts);
 
-  g.append('line')
-    .attr('x1', xScale(x1)).attr('y1', yScale(y1))
-    .attr('x2', xScale(x2)).attr('y2', yScale(y2))
-    .attr('stroke', '#f03b20').attr('stroke-width', 1.5)
-    .attr('stroke-dasharray', '6,3').attr('opacity', 0.8);
+  if (r2 >= 0.1) {
+    const reg = ols(pts);
+    const x1 = 0, x2 = xMax;
+    const y1 = reg.a + reg.b * x1;
+    const y2 = reg.a + reg.b * x2;
+
+    g.append('line')
+      .attr('x1', xScale(x1)).attr('y1', yScale(y1))
+      .attr('x2', xScale(x2)).attr('y2', yScale(y2))
+      .attr('stroke', '#f03b20').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '6,3').attr('opacity', 0.8);
+  }
 
   // Data points
   scatterCircles = g.selectAll('circle')
@@ -992,8 +997,6 @@ function initScatter(data) {
     .on('mouseout', () => resetScatterHighlight());
 
   // Stats
-  const r2 = pearsonR(pts) ** 2;
-  const r  = pearsonR(pts);
   document.getElementById('stat-r2').textContent = r2.toFixed(3);
   document.getElementById('stat-r').textContent  = r.toFixed(3);
   document.getElementById('stat-n').textContent  = features.length;
