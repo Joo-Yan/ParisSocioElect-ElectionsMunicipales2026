@@ -1,5 +1,5 @@
 """
-Paris Vote Map — scripts/process.py
+ParisSocioElect — scripts/process.py
 Entrée  : data/raw/ (fichiers originaux)
 Sortie  : data/processed/paris_2026_t1.geojson
 

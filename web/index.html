@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Paris Vote Map · Municipales 2026 · T1</title>
+  <title>SocioÉlect Paris · Municipales 2026 · T1</title>
 
   <!-- MapLibre GL JS -->
   <link href="https://unpkg.com/maplibre-gl@3/dist/maplibre-gl.css" rel="stylesheet">
@@ -13,12 +13,30 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 
   <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg-base:      #0d1117;
+      --bg-panel:     #161b22;
+      --bg-elevated:  #1c2333;
+      --bg-card:      rgba(255,255,255,0.04);
+      --border:       rgba(255,255,255,0.08);
+      --border-mid:   rgba(255,255,255,0.12);
+      --border-hi:    rgba(255,255,255,0.2);
+      --text-primary: #c9d1d9;
+      --text-hi:      #e6edf3;
+      --text-muted:   #7d8590;
+      --accent:       #58a6ff;
+      --accent-dim:   rgba(88,166,255,0.15);
+      --radius:       8px;
+      --radius-sm:    5px;
+    }
+
     /* ── Reset & Base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1a1a2e;
-      color: #e8e8e8;
+      background: var(--bg-base);
+      color: var(--text-primary);
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -27,27 +45,54 @@
 
     /* ── Header ── */
     #header {
-      height: 56px;
-      background: #16213e;
-      border-bottom: 1px solid #0f3460;
+      height: 52px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       padding: 0 20px;
-      gap: 16px;
+      gap: 12px;
       flex-shrink: 0;
       z-index: 10;
     }
+    #header-logo {
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(135deg, #58a6ff 0%, #9c78f0 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
     #header h1 {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
-      color: #e8e8e8;
-      letter-spacing: 0.3px;
+      color: var(--text-hi);
+      letter-spacing: 0.2px;
     }
     #header .subtitle {
-      font-size: 12px;
-      color: #8892b0;
+      font-size: 11.5px;
+      color: var(--text-muted);
     }
-    #header .dot { color: #0f3460; }
+    #header .sep {
+      color: var(--border-mid);
+      font-size: 16px;
+      font-weight: 200;
+    }
+    #header-spacer { flex: 1; }
+    #header-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      color: #58a6ff;
+      background: var(--accent-dim);
+      border: 1px solid rgba(88,166,255,0.25);
+      border-radius: 4px;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
 
     /* ── Main Layout ── */
     #main {
@@ -68,19 +113,21 @@
       position: absolute;
       top: 12px;
       right: 12px;
-      background: rgba(22, 33, 62, 0.92);
-      backdrop-filter: blur(8px);
-      border: 1px solid #0f3460;
-      border-radius: 8px;
-      padding: 10px 14px;
+      background: rgba(13,17,23,0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 10px 12px;
       z-index: 5;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
     }
     #mobile-layer-toggle {
       display: none;
       width: 100%;
       background: transparent;
-      border: 1px solid #0f3460;
-      color: #4a90d9;
+      border: 1px solid var(--border-mid);
+      color: var(--accent);
       border-radius: 999px;
       padding: 6px 10px;
       font-size: 11px;
@@ -88,10 +135,10 @@
       margin-bottom: 8px;
     }
     #layer-controls .ctrl-label {
-      font-size: 11px;
-      color: #8892b0;
+      font-size: 10px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 1px;
       margin-bottom: 8px;
     }
     #layer-controls .ctrl-group {
@@ -101,90 +148,170 @@
       margin-bottom: 0;
     }
     #layer-controls .group-title {
-      font-size: 10px;
-      color: #4a90d9;
+      font-size: 9.5px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin: 0 0 6px;
+      letter-spacing: 1px;
+      margin: 0 0 5px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
     }
     .layer-btn {
-      display: block;
+      display: flex;
+      align-items: center;
       width: 100%;
       text-align: left;
       background: transparent;
-      border: 1px solid #0f3460;
-      color: #8892b0;
-      font-size: 12px;
-      padding: 5px 10px;
-      border-radius: 5px;
+      border: 1px solid transparent;
+      border-left: 3px solid transparent;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      padding: 5px 9px 5px 8px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       transition: all 0.15s;
+      gap: 6px;
     }
     .layer-btn:last-child { margin-bottom: 0; }
     .layer-btn.active {
-      background: #0f3460;
-      color: #e8e8e8;
-      border-color: #4a90d9;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-hi);
+      border-color: rgba(255,255,255,0.06);
+      border-left-color: var(--party-color, var(--accent));
     }
-    .layer-btn:hover:not(.active) { border-color: #4a90d9; color: #e8e8e8; }
+    .layer-btn:hover:not(.active) {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+      border-left-color: rgba(255,255,255,0.2);
+    }
+    .party-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #fff;
+      background: var(--party-color, #444);
+      flex-shrink: 0;
+      line-height: 1.6;
+      opacity: 0.9;
+    }
+    .layer-btn.active .party-badge { opacity: 1; }
 
     /* Legend */
     #legend {
       position: absolute;
       bottom: 28px;
       left: 12px;
-      background: rgba(22, 33, 62, 0.92);
-      backdrop-filter: blur(8px);
-      border: 1px solid #0f3460;
-      border-radius: 8px;
+      background: rgba(13,17,23,0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
       padding: 10px 14px;
       z-index: 5;
-      min-width: 180px;
+      min-width: 190px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    #legend-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
     }
     #legend .legend-title {
       font-size: 11px;
-      color: #8892b0;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 8px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    #legend-party-badge {
+      display: none;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #fff;
+      letter-spacing: 0.4px;
+      line-height: 1.6;
     }
     #legend-bar {
       display: flex;
-      height: 10px;
+      height: 8px;
       border-radius: 3px;
       overflow: hidden;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }
     #legend-bar div { flex: 1; }
     #legend-labels {
       display: flex;
       justify-content: space-between;
       font-size: 10px;
-      color: #8892b0;
+      color: var(--text-muted);
     }
 
     /* Tooltip */
     #tooltip {
       position: absolute;
       pointer-events: none;
-      background: rgba(22, 33, 62, 0.96);
-      border: 1px solid #4a90d9;
-      border-radius: 8px;
-      padding: 10px 14px;
+      background: rgba(13,17,23,0.96);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius);
+      padding: 11px 14px;
       font-size: 12px;
-      line-height: 1.7;
+      line-height: 1.6;
       z-index: 100;
-      max-width: 260px;
+      max-width: 280px;
       display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
-    #tooltip strong { color: #4a90d9; font-size: 13px; }
+    #tooltip .tip-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-hi);
+      margin-bottom: 7px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid var(--border);
+    }
+    #tooltip .tip-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    #tooltip .tip-row .tip-label { color: var(--text-muted); }
+    #tooltip .tip-row .tip-val   { font-weight: 500; color: var(--text-primary); }
+    #tooltip .tip-candidates {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+    #tooltip .tip-cand {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+    }
+    #tooltip .tip-cand-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #tooltip .tip-cand-name { color: var(--text-muted); }
+    #tooltip .tip-cand-pct  { font-weight: 600; margin-left: auto; color: var(--text-primary); }
     #tooltip .tip-warn {
       font-size: 10px;
-      color: #8892b0;
-      margin-top: 6px;
-      border-top: 1px solid #0f3460;
-      padding-top: 6px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 7px;
       line-height: 1.5;
     }
 
@@ -193,12 +320,13 @@
       flex: 0 0 40%;
       display: flex;
       flex-direction: column;
-      border-left: 1px solid #0f3460;
+      border-left: 1px solid var(--border);
       overflow: hidden;
+      background: var(--bg-panel);
     }
     #chart-header {
       padding: 14px 20px 10px;
-      border-bottom: 1px solid #0f3460;
+      border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
     #chart-header-top {
@@ -207,13 +335,13 @@
       justify-content: space-between;
       gap: 12px;
     }
-    #chart-header h2 { font-size: 13px; font-weight: 600; color: #e8e8e8; }
-    #chart-header p  { font-size: 11px; color: #8892b0; margin-top: 2px; }
+    #chart-header h2 { font-size: 13px; font-weight: 600; color: var(--text-hi); }
+    #chart-header p  { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
     #mobile-chart-toggle {
       display: none;
       background: transparent;
-      border: 1px solid #0f3460;
-      color: #4a90d9;
+      border: 1px solid var(--border-mid);
+      color: var(--accent);
       border-radius: 999px;
       padding: 5px 10px;
       font-size: 11px;
@@ -234,18 +362,21 @@
     }
     .axis-control label {
       font-size: 10px;
-      color: #4a90d9;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 1px;
     }
     .axis-control select {
-      background: rgba(15, 52, 96, 0.45);
-      border: 1px solid #0f3460;
-      color: #e8e8e8;
+      background: var(--bg-card);
+      border: 1px solid var(--border-mid);
+      color: var(--text-primary);
       border-radius: 6px;
       padding: 6px 8px;
       font-size: 12px;
+      outline: none;
+      transition: border-color 0.15s;
     }
+    .axis-control select:focus { border-color: var(--accent); }
     #scatter-container {
       flex: 1;
       padding: 10px 20px 20px;
@@ -257,12 +388,25 @@
     #stats-bar {
       padding: 8px 20px 14px;
       display: flex;
-      gap: 20px;
+      gap: 0;
       flex-shrink: 0;
-      border-top: 1px solid #0f3460;
+      border-top: 1px solid var(--border);
     }
-    .stat-item { font-size: 11px; color: #8892b0; }
-    .stat-item span { color: #4a90d9; font-weight: 600; }
+    .stat-item {
+      font-size: 11px;
+      color: var(--text-muted);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .stat-item:not(:last-child) {
+      border-right: 1px solid var(--border);
+      padding-right: 16px;
+      margin-right: 16px;
+    }
+    .stat-item .stat-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.8px; }
+    .stat-item .stat-val   { font-size: 13px; font-weight: 600; color: var(--accent); }
 
     /* ── Responsive ── */
     @media (max-width: 768px) {
@@ -270,32 +414,28 @@
       body { overflow: auto; }
       #header {
         height: auto;
-        min-height: 56px;
+        min-height: 52px;
         padding: 10px 14px;
         gap: 8px;
         flex-wrap: wrap;
         align-items: flex-start;
       }
-      #header .dot { display: none; }
+      #header .sep, #header-spacer, #header-badge { display: none; }
       #header h1 {
         width: 100%;
-        font-size: 14px;
+        font-size: 13px;
       }
       #header .subtitle {
         width: 100%;
         font-size: 11px;
         line-height: 1.4;
       }
-      #main {
-        overflow: visible;
-      }
+      #main { overflow: visible; }
       #map-panel {
         flex: 0 0 52vh;
         min-height: 420px;
       }
-      #map {
-        min-height: 420px;
-      }
+      #map { min-height: 420px; }
       #layer-controls {
         top: 8px;
         left: 8px;
@@ -305,9 +445,7 @@
         max-height: 46vh;
         overflow: auto;
       }
-      #mobile-layer-toggle {
-        display: block;
-      }
+      #mobile-layer-toggle { display: block; }
       body.mobile-layers-collapsed #layer-controls {
         width: auto;
         max-width: calc(100vw - 16px);
@@ -316,12 +454,10 @@
       body.mobile-layers-collapsed #layer-controls .ctrl-group {
         display: none;
       }
-      body.mobile-layers-collapsed #mobile-layer-toggle {
-        margin-bottom: 0;
-      }
+      body.mobile-layers-collapsed #mobile-layer-toggle { margin-bottom: 0; }
       .layer-btn {
         font-size: 11px;
-        padding: 6px 8px;
+        padding: 5px 8px 5px 7px;
       }
       #legend {
         left: 8px;
@@ -331,56 +467,25 @@
         width: auto;
         padding: 8px 10px;
       }
-      #legend .legend-title {
-        font-size: 10px;
-        margin-bottom: 6px;
-      }
-      #legend-labels {
-        font-size: 9px;
-      }
+      #legend .legend-title { font-size: 10px; }
+      #legend-labels { font-size: 9px; }
       #tooltip {
-        max-width: min(260px, calc(100vw - 24px));
+        max-width: min(280px, calc(100vw - 24px));
         font-size: 11px;
       }
-      #chart-panel { flex: 0 0 auto; border-left: none; border-top: 1px solid #0f3460; }
-      #chart-header {
-        padding: 12px 14px 10px;
-      }
-      #chart-header-top {
-        align-items: flex-start;
-      }
-      #chart-header h2 {
-        font-size: 12px;
-        line-height: 1.4;
-      }
-      #chart-header p {
-        font-size: 10px;
-        line-height: 1.4;
-      }
+      #chart-panel { flex: 0 0 auto; border-left: none; border-top: 1px solid var(--border); }
+      #chart-header { padding: 12px 14px 10px; }
+      #chart-header-top { align-items: flex-start; }
+      #chart-header h2 { font-size: 12px; line-height: 1.4; }
+      #chart-header p  { font-size: 10px; line-height: 1.4; }
       #mobile-chart-toggle { display: inline-flex; align-items: center; }
-      #axis-controls {
-        flex-direction: column;
-        gap: 8px;
-      }
-      .axis-control {
-        min-width: 0;
-        width: 100%;
-      }
-      .axis-control select {
-        width: 100%;
-      }
-      #scatter-container {
-        min-height: 260px;
-        padding: 8px 14px 14px;
-      }
-      #stats-bar {
-        padding: 8px 14px 12px;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-      .stat-item {
-        font-size: 10px;
-      }
+      #axis-controls { flex-direction: column; gap: 8px; }
+      .axis-control { min-width: 0; width: 100%; }
+      .axis-control select { width: 100%; }
+      #scatter-container { min-height: 260px; padding: 8px 14px 14px; }
+      #stats-bar { padding: 8px 14px 12px; gap: 0; flex-wrap: wrap; }
+      .stat-item { font-size: 10px; flex: none; width: auto; }
+      .stat-item:not(:last-child) { border-right: none; padding-right: 0; margin-right: 12px; }
       body.mobile-chart-collapsed #chart-panel { max-height: 70px; }
       body.mobile-chart-collapsed #scatter-container,
       body.mobile-chart-collapsed #stats-bar,
@@ -395,26 +500,13 @@
     }
 
     @media (max-width: 420px) {
-      #map-panel {
-        min-height: 380px;
-      }
-      #map {
-        min-height: 380px;
-      }
-      #layer-controls {
-        max-height: 42vh;
-      }
-      #chart-header-top {
-        flex-direction: column;
-      }
-      #mobile-chart-toggle {
-        width: 100%;
-        justify-content: center;
-      }
-      #stats-bar {
-        flex-direction: column;
-        gap: 6px;
-      }
+      #map-panel  { min-height: 380px; }
+      #map        { min-height: 380px; }
+      #layer-controls { max-height: 42vh; }
+      #chart-header-top { flex-direction: column; }
+      #mobile-chart-toggle { width: 100%; justify-content: center; }
+      #stats-bar { flex-direction: column; gap: 6px; }
+      .stat-item:not(:last-child) { border-right: none; }
     }
 
     /* MapLibre attribution */
@@ -424,9 +516,12 @@
 <body>
 
 <header id="header">
-  <h1>Paris Vote Map</h1>
-  <span class="dot">·</span>
-  <span class="subtitle">Élections municipales 2026 · Premier tour · ~900 bureaux de vote</span>
+  <div id="header-logo">🗳</div>
+  <h1>SocioÉlect Paris</h1>
+  <span class="sep">|</span>
+  <span class="subtitle">Municipales 2026 · Premier tour · ~900 bureaux de vote</span>
+  <div id="header-spacer"></div>
+  <span id="header-badge">T1 · 2026</span>
 </header>
 
 <div id="main">
@@ -445,17 +540,20 @@
       </div>
       <div class="ctrl-group">
         <div class="group-title">Candidats</div>
-        <button class="layer-btn" data-layer="gregoire">Grégoire</button>
-        <button class="layer-btn" data-layer="dati">Dati</button>
-        <button class="layer-btn" data-layer="chikirou">Chikirou</button>
-        <button class="layer-btn" data-layer="bournazel">Bournazel</button>
-        <button class="layer-btn" data-layer="knafo">Knafo</button>
-        <button class="layer-btn" data-layer="autres">Autres</button>
+        <button class="layer-btn" data-layer="gregoire" style="--party-color:#E91E8C"><span class="party-badge" style="background:#E91E8C">LUG</span>Grégoire</button>
+        <button class="layer-btn" data-layer="dati"     style="--party-color:#1A5CB8"><span class="party-badge" style="background:#1A5CB8">LUD</span>Dati</button>
+        <button class="layer-btn" data-layer="chikirou" style="--party-color:#CC0000"><span class="party-badge" style="background:#CC0000">LFI</span>Chikirou</button>
+        <button class="layer-btn" data-layer="bournazel" style="--party-color:#E07B00"><span class="party-badge" style="background:#E07B00">LUC</span>Bournazel</button>
+        <button class="layer-btn" data-layer="knafo"    style="--party-color:#1E5F8A"><span class="party-badge" style="background:#1E5F8A">LEXD</span>Knafo</button>
+        <button class="layer-btn" data-layer="autres"   style="--party-color:#555e6d"><span class="party-badge" style="background:#555e6d">–</span>Autres</button>
       </div>
     </div>
 
     <div id="legend">
-      <div class="legend-title" id="legend-title">Abstention (%)</div>
+      <div id="legend-header">
+        <span class="legend-title" id="legend-title">Abstention (%)</span>
+        <span id="legend-party-badge"></span>
+      </div>
       <div id="legend-bar"></div>
       <div id="legend-labels">
         <span id="leg-min">–</span>
@@ -490,9 +588,9 @@
       <svg id="scatter"></svg>
     </div>
     <div id="stats-bar">
-      <div class="stat-item">r² = <span id="stat-r2">–</span></div>
-      <div class="stat-item">r (Pearson) = <span id="stat-r">–</span></div>
-      <div class="stat-item">n = <span id="stat-n">–</span></div>
+      <div class="stat-item"><span class="stat-label">r²</span><span class="stat-val" id="stat-r2">–</span></div>
+      <div class="stat-item"><span class="stat-label">r Pearson</span><span class="stat-val" id="stat-r">–</span></div>
+      <div class="stat-item"><span class="stat-label">n bureaux</span><span class="stat-val" id="stat-n">–</span></div>
     </div>
   </div>
 </div>
@@ -518,12 +616,22 @@ const COLORS = {
   abstention: ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
   revenu:     ['#edf8fb','#b3cde3','#8c96c6','#8856a7','#810f7c'],
   hlm:        ['#ffffcc','#c2e699','#78c679','#31a354','#006837'],
-  gregoire:   ['#fde0dd','#fcbba1','#fc9272','#fb6a4a','#cb181d'],
-  dati:       ['#eff3ff','#bdd7e7','#6baed6','#3182bd','#08519c'],
-  chikirou:   ['#edf8e9','#bae4b3','#74c476','#31a354','#006d2c'],
-  bournazel:  ['#fff5eb','#fdd0a2','#fdae6b','#f16913','#a63603'],
-  knafo:      ['#f2f0f7','#cbc9e2','#9e9ac8','#756bb1','#54278f'],
-  autres:     ['#f7f7f7','#d9d9d9','#bdbdbd','#969696','#525252']
+  gregoire:   ['#fce4f3','#f4a8d4','#ec6db5','#d41880','#9d005d'],  // LUG rose
+  dati:       ['#dde8ff','#99b8ec','#5585d8','#1a5cb8','#0a2f70'],  // LUD bleu
+  chikirou:   ['#ffe5e5','#ffaaaa','#ee5555','#cc0000','#840000'],  // LFI rouge
+  bournazel:  ['#fff3e0','#ffcc80','#ffa040','#e07b00','#904000'],  // LUC orange
+  knafo:      ['#dde8f5','#90b8d8','#4d88b8','#1e5f8a','#0a3050'],  // LEXD bleu marine
+  autres:     ['#f0f0f0','#d0d0d0','#a0a0a0','#6b6b6b','#404040']
+};
+
+// Métadonnées partisanes
+const PARTY_META = {
+  gregoire:  { list: 'LUG',  label: 'Union des gauches', color: '#E91E8C' },
+  dati:      { list: 'LUD',  label: 'Droite',            color: '#1A5CB8' },
+  chikirou:  { list: 'LFI',  label: 'France Insoumise',  color: '#CC0000' },
+  bournazel: { list: 'LUC',  label: 'Centre',            color: '#E07B00' },
+  knafo:     { list: 'LEXD', label: 'Extrême droite',    color: '#1E5F8A' },
+  autres:    { list: '–',    label: 'Autres listes',     color: '#555e6d' }
 };
 
 const LAYER_META = {
@@ -598,8 +706,25 @@ function updateLegend(layer) {
   const meta   = LAYER_META[layer];
   const colors = COLORS[layer];
   const b      = BREAKS[layer];
+  const party  = PARTY_META[layer];
 
   document.getElementById('legend-title').textContent = meta.label;
+
+  const badge = document.getElementById('legend-party-badge');
+  if (party) {
+    badge.textContent  = party.list;
+    badge.style.background = party.color;
+    badge.style.display = 'inline-flex';
+    badge.style.alignItems = 'center';
+    badge.style.padding = '1px 5px';
+    badge.style.borderRadius = '3px';
+    badge.style.fontSize = '8.5px';
+    badge.style.fontWeight = '700';
+    badge.style.letterSpacing = '0.4px';
+    badge.style.color = '#fff';
+  } else {
+    badge.style.display = 'none';
+  }
 
   const bar = document.getElementById('legend-bar');
   bar.innerHTML = '';
@@ -814,12 +939,32 @@ map.on('mousemove', 'bv-fill', e => {
   const fmt = (v, d=1) => (v == null || v === 'null') ? '–'
     : (d === 0 ? Math.round(+v).toLocaleString('fr-FR') : (+v).toFixed(d));
 
+  const candidateRows = [
+    { key: 'gregoire',  field: 'pct_gregoire',  name: 'Grégoire' },
+    { key: 'dati',      field: 'pct_dati',      name: 'Dati' },
+    { key: 'chikirou',  field: 'pct_chikirou',  name: 'Chikirou' },
+    { key: 'bournazel', field: 'pct_bournazel', name: 'Bournazel' },
+    { key: 'knafo',     field: 'pct_knafo',     name: 'Knafo' }
+  ].filter(c => props[c.field] != null && props[c.field] !== 'null');
+
+  const candidatesHtml = candidateRows.length ? `
+    <div class="tip-candidates">
+      ${candidateRows.map(c => `
+        <div class="tip-cand">
+          <span class="tip-cand-dot" style="background:${PARTY_META[c.key].color}"></span>
+          <span class="tip-cand-name">${c.name}</span>
+          <span class="tip-cand-pct">${fmt(props[c.field])}%</span>
+        </div>
+      `).join('')}
+    </div>` : '';
+
   tooltip.innerHTML = `
-    <strong>BV ${props.code_bv}${props.arrondissement ? ' — ' + props.arrondissement : ''}</strong><br>
-    Inscrits&nbsp;: ${fmt(props.inscrits, 0)}<br>
-    Abstention&nbsp;: <b>${fmt(props.taux_abstention)}%</b><br>
-    Revenu médian&nbsp;: ${fmt(props.revenu_median, 0)} €/UC<br>
-    Logements HLM&nbsp;: ${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)
+    <div class="tip-title">BV ${props.code_bv}${props.arrondissement ? ' · ' + props.arrondissement : ''}</div>
+    <div class="tip-row"><span class="tip-label">Inscrits</span><span class="tip-val">${fmt(props.inscrits, 0)}</span></div>
+    <div class="tip-row"><span class="tip-label">Abstention</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
+    <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
+    <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
+    ${candidatesHtml}
     <div class="tip-warn">
       ⚠ L'abstention est calculée sur les inscrits uniquement.
       Dans les quartiers HLM, le taux réel de non-participation
