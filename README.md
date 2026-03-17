@@ -5,6 +5,9 @@
 
 > Carte interactive des ~900 bureaux de vote parisiens pour les municipales 2026, croisée avec des indicateurs socio-économiques INSEE pour étudier la géographie de l'abstention et du vote.
 
+Accès direct à la version en ligne :
+https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
+
 ---
 
 ## Ce que fait ce projet

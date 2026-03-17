@@ -5,6 +5,9 @@
 
 > 面向 2026 年巴黎市政选举约 900 个投票站的交互式地图，结合 INSEE 社会经济指标，用于研究弃权率与投票选择的空间分布。
 
+在线访问地址：
+https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
+
 ---
 
 ## 项目简介

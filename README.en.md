@@ -5,6 +5,9 @@
 
 > Interactive map of ~900 Paris voting precincts for the 2026 municipal elections, crossed with INSEE socioeconomic indicators to study the geography of abstention and political choice.
 
+Live version:
+https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
+
 ---
 
 ## What this project does
