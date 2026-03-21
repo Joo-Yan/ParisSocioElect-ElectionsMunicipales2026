@@ -1,6 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { COLORS, BREAKS, LAYER_META, PARTY_META } from './layers.js';
+import { COLORS, BREAKS, LAYER_META, PARTY_META, LISA_COLORS, CLUSTER_COLORS } from './layers.js';
 import { formatValue } from './utils.js';
 
 let map;
@@ -26,16 +26,44 @@ export function initMap() {
     center: [2.3522, 48.8566],
     zoom: 11.2,
     minZoom: 10,
-    maxZoom: 16
+    maxZoom: 16,
+    preserveDrawingBuffer: true
   });
   map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
   return map;
 }
 
 export function buildColorExpr(layer) {
-  const { field } = LAYER_META[layer];
-  const colors    = COLORS[layer];
-  const b         = BREAKS[layer];
+  const meta = LAYER_META[layer];
+  const { field } = meta;
+
+  // Categorical layers: LISA and cluster
+  if (meta.categorical) {
+    if (layer.startsWith('lisa_')) {
+      // LISA: match string values HH/HL/LH/LL/NS
+      return [
+        'match', ['get', field],
+        'HH', LISA_COLORS.HH,
+        'HL', LISA_COLORS.HL,
+        'LH', LISA_COLORS.LH,
+        'LL', LISA_COLORS.LL,
+        LISA_COLORS.NS  // default (NS or missing)
+      ];
+    }
+    if (layer === 'cluster') {
+      // Cluster: match numeric IDs to colors
+      const matchExpr = ['match', ['get', field]];
+      for (let i = 0; i < CLUSTER_COLORS.length; i++) {
+        matchExpr.push(i, CLUSTER_COLORS[i]);
+      }
+      matchExpr.push('#404040'); // default
+      return matchExpr;
+    }
+  }
+
+  // Quantile layers: use step expression with computed breaks
+  const colors = COLORS[layer];
+  const b      = BREAKS[layer];
   if (!b) return '#555555';
   return [
     'case',
@@ -102,8 +130,6 @@ export function switchMapLayer(layer) {
 
 export function updateLegend(layer) {
   const meta   = LAYER_META[layer];
-  const colors = COLORS[layer];
-  const b      = BREAKS[layer];
   const party  = PARTY_META[layer];
 
   document.getElementById('legend-title').textContent = meta.label;
@@ -122,6 +148,41 @@ export function updateLegend(layer) {
     badge.style.color       = '#fff';
   } else {
     badge.style.display = 'none';
+  }
+
+  // Categorical legends (LISA, cluster)
+  if (meta.categorical) {
+    const bar = document.getElementById('legend-bar');
+    bar.innerHTML = '';
+    const labels = document.getElementById('legend-labels');
+
+    if (layer.startsWith('lisa_')) {
+      const cats = [
+        { key: 'HH', label: 'HH', color: LISA_COLORS.HH },
+        { key: 'HL', label: 'HL', color: LISA_COLORS.HL },
+        { key: 'LH', label: 'LH', color: LISA_COLORS.LH },
+        { key: 'LL', label: 'LL', color: LISA_COLORS.LL },
+        { key: 'NS', label: 'NS', color: LISA_COLORS.NS },
+      ];
+      cats.forEach(c => {
+        const d = document.createElement('div');
+        d.style.background = c.color;
+        bar.appendChild(d);
+      });
+      document.getElementById('leg-min').textContent = 'HH';
+      document.getElementById('leg-mid').textContent = 'LH · HL';
+      document.getElementById('leg-max').textContent = 'LL';
+    } else if (layer === 'cluster') {
+      for (let i = 0; i < 6; i++) {
+        const d = document.createElement('div');
+        d.style.background = CLUSTER_COLORS[i] || '#404040';
+        bar.appendChild(d);
+      }
+      document.getElementById('leg-min').textContent = 'Cluster 0';
+      document.getElementById('leg-mid').textContent = '';
+      document.getElementById('leg-max').textContent = 'Cluster N';
+    }
+    return;
   }
 
   const bar = document.getElementById('legend-bar');
@@ -186,6 +247,16 @@ function setupTooltip() {
       <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
       <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
       ${candidatesHtml}
+      ${props.cluster_id != null ? `
+      <div class="tip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
+        <span class="tip-label">Cluster</span>
+        <span class="tip-val">${props.cluster_id}</span>
+      </div>` : ''}
+      ${props.lisa_taux_abstention && props.lisa_taux_abstention !== 'NS' ? `
+      <div class="tip-row">
+        <span class="tip-label">LISA abst.</span>
+        <span class="tip-val" style="color:${LISA_COLORS[props.lisa_taux_abstention] || '#888'}">${props.lisa_taux_abstention}</span>
+      </div>` : ''}
       <div class="tip-warn">
         ⚠ L'abstention est calculée sur les inscrits uniquement.
         Dans les quartiers HLM, le taux réel de non-participation

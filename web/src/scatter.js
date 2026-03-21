@@ -191,3 +191,62 @@ export function resetScatterHighlight() {
     .attr('opacity', 0.65)
     .attr('stroke', 'none');
 }
+
+export function highlightScatterArrondissement(arrondissement) {
+  if (!scatterCircles) return;
+  scatterCircles
+    .attr('r', f => f.properties.arrondissement === arrondissement ? 5 : 2.5)
+    .attr('opacity', f => f.properties.arrondissement === arrondissement ? 1 : 0.15)
+    .attr('stroke', f => f.properties.arrondissement === arrondissement ? '#ffffff' : 'none')
+    .attr('stroke-width', 1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SVG → PNG Export
+// ═══════════════════════════════════════════════════════════
+function initScatterExport() {
+  const btn = document.getElementById('scatter-export-btn');
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = '1';
+  btn.addEventListener('click', () => {
+    const svgEl = document.getElementById('scatter');
+    if (!svgEl) return;
+
+    const w = +svgEl.getAttribute('width') || svgEl.clientWidth;
+    const h = +svgEl.getAttribute('height') || svgEl.clientHeight;
+
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svgEl);
+
+    const canvas = document.createElement('canvas');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Dark background
+    ctx.fillStyle = '#161b22';
+    ctx.fillRect(0, 0, w, h);
+
+    const img = new Image();
+    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+
+      const axes = getScatterAxes();
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `socioelect_scatter_${axes.x}_${axes.y}_${ts}.png`;
+      a.click();
+    };
+    img.src = url;
+  });
+}
+
+// Auto-init on module load
+initScatterExport();

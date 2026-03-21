@@ -33,8 +33,28 @@ export const LAYER_META = {
   chikirou:   { field: 'pct_chikirou',    label: 'Score Chikirou (%)',    shortLabel: 'Chikirou',           unit: '%',       decimals: 1 },
   bournazel:  { field: 'pct_bournazel',   label: 'Score Bournazel (%)',   shortLabel: 'Bournazel',          unit: '%',       decimals: 1 },
   knafo:      { field: 'pct_knafo',       label: 'Score Knafo (%)',       shortLabel: 'Knafo',              unit: '%',       decimals: 1 },
-  autres:     { field: 'pct_autres',      label: 'Autres listes (%)',     shortLabel: 'Autres listes',      unit: '%',       decimals: 1 }
+  autres:     { field: 'pct_autres',      label: 'Autres listes (%)',     shortLabel: 'Autres listes',      unit: '%',       decimals: 1 },
+  // Spatial analysis layers (categorical — no quintile breaks)
+  lisa_abstention: { field: 'lisa_taux_abstention', label: 'LISA · Abstention',    shortLabel: 'LISA Abstention', unit: '',  decimals: 0, categorical: true },
+  lisa_revenu:     { field: 'lisa_revenu_median',   label: 'LISA · Revenu',        shortLabel: 'LISA Revenu',     unit: '',  decimals: 0, categorical: true },
+  lisa_hlm:        { field: 'lisa_hlm_density',     label: 'LISA · HLM',           shortLabel: 'LISA HLM',        unit: '',  decimals: 0, categorical: true },
+  cluster:         { field: 'cluster_id',           label: 'Typologie sociale',    shortLabel: 'Clusters',        unit: '',  decimals: 0, categorical: true },
 };
+
+// LISA categorical colors: HH (hot-hot), HL, LH, LL (cold-cold), NS (not significant)
+export const LISA_COLORS = {
+  'HH': '#e41a1c',   // red — high surrounded by high
+  'HL': '#ff7f7f',   // light red — high surrounded by low (spatial outlier)
+  'LH': '#7fbfff',   // light blue — low surrounded by high (spatial outlier)
+  'LL': '#2166ac',   // blue — low surrounded by low
+  'NS': '#404040',   // dark gray — not significant
+};
+
+// Cluster categorical colors (up to 8 clusters)
+export const CLUSTER_COLORS = [
+  '#e41a1c', '#377eb8', '#4daf4a', '#984ea3',
+  '#ff7f00', '#ffff33', '#a65628', '#f781bf',
+];
 
 // ═══════════════════════════════════════════════════════════
 // DYNAMIC BREAKPOINTS — computed from GeoJSON data

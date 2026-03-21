@@ -13,6 +13,7 @@
   <span class="sep">|</span>
   <span class="subtitle">Municipales 2026 · Premier tour · ~900 bureaux de vote</span>
   <div id="header-spacer"></div>
+  <button id="csv-download-btn" type="button" title="Télécharger les données (CSV)">CSV</button>
   <span id="header-badge">T1 · 2026</span>
 </header>
 
@@ -39,6 +40,13 @@
         <button class="layer-btn" data-layer="knafo"    style="--party-color:#1E5F8A"><span class="party-badge" style="background:#1E5F8A">LEXD</span>Knafo</button>
         <button class="layer-btn" data-layer="autres"   style="--party-color:#555e6d"><span class="party-badge" style="background:#555e6d">–</span>Autres</button>
       </div>
+      <div class="ctrl-group">
+        <div class="group-title">Analyse spatiale</div>
+        <button class="layer-btn" data-layer="lisa_abstention">LISA · Abstention</button>
+        <button class="layer-btn" data-layer="lisa_revenu">LISA · Revenu</button>
+        <button class="layer-btn" data-layer="lisa_hlm">LISA · HLM</button>
+        <button class="layer-btn" data-layer="cluster">Typologie sociale</button>
+      </div>
     </div>
 
     <div id="legend">
@@ -54,6 +62,7 @@
       </div>
     </div>
 
+    <button id="map-export-btn" type="button" title="Exporter la carte (PNG)">&#128247;</button>
     <div id="tooltip"></div>
   </div>
 
@@ -62,6 +71,7 @@
     <div id="chart-header">
       <div id="chart-header-top">
         <h2>Densité HLM × Taux d'abstention</h2>
+        <button id="scatter-export-btn" type="button" title="Exporter le graphique (PNG)">&#128247;</button>
         <button id="mobile-chart-toggle" type="button">Ouvrir le graphique</button>
       </div>
       <p>Chaque point = 1 bureau de vote · couleur = arrondissement</p>
@@ -79,6 +89,7 @@
     <div id="scatter-container">
       <svg id="scatter"></svg>
     </div>
+    <div id="barchart-container"></div>
     <div id="stats-bar">
       <div class="stat-item"><span class="stat-label">r²</span><span class="stat-val" id="stat-r2">–</span></div>
       <div class="stat-item"><span class="stat-label">r Pearson</span><span class="stat-val" id="stat-r">–</span></div>
