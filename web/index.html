@@ -17,6 +17,7 @@
   <span class="sep">|</span>
   <span class="subtitle">Municipales 2026 · Premier tour · ~900 bureaux de vote</span>
   <div id="header-spacer"></div>
+  <button id="story-btn" type="button" title="Récit analytique guidé">Récit</button>
   <button id="csv-download-btn" type="button" title="Télécharger les données (CSV)">CSV</button>
   <span id="header-badge">T1 · 2026</span>
 </header>
@@ -47,6 +48,21 @@
 
     <button id="map-export-btn" type="button" title="Exporter la carte (PNG)">&#128247;</button>
     <div id="tooltip"></div>
+  </div>
+
+  <!-- Story panel (scrollytelling narrative) -->
+  <div id="story-panel">
+    <div id="story-header">
+      <span class="story-label">Récit analytique</span>
+      <button id="story-close-btn" type="button">✕ Quitter</button>
+    </div>
+    <div id="story-scroll">
+      <div id="story-steps"></div>
+      <div id="story-footer">
+        <p>Vous avez parcouru l'ensemble des analyses. Retournez à l'exploration libre pour interagir avec toutes les couches et données.</p>
+        <button id="story-exit-btn" type="button">Explorer les données →</button>
+      </div>
+    </div>
   </div>
 
   <!-- Chart -->

@@ -12,6 +12,7 @@ import {
 } from './scatter.js';
 import { isMobileLayout } from './utils.js';
 import { updateBarChart, setBarChartHighlightCallback } from './barchart.js';
+import { initStory, openStory, closeStory } from './story.js';
 
 // ═══════════════════════════════════════════════════════════
 // State
@@ -308,11 +309,26 @@ map.on('load', () => {
       if (params.layer || params.x || params.lat) {
         applyHashState();
       }
+      // Init story after data is ready
+      initStory({ switchLayer });
     })
     .catch(err => {
       console.error(err);
       alert('Impossible de charger le GeoJSON.\n' + err.message);
     });
+});
+
+// ═══════════════════════════════════════════════════════════
+// Story mode
+// ═══════════════════════════════════════════════════════════
+document.getElementById('story-btn').addEventListener('click', () => {
+  openStory();
+});
+document.getElementById('story-close-btn').addEventListener('click', () => {
+  closeStory();
+});
+document.getElementById('story-exit-btn').addEventListener('click', () => {
+  closeStory();
 });
 
 // ═══════════════════════════════════════════════════════════
