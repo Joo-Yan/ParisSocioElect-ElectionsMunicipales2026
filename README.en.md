@@ -21,6 +21,14 @@ This project produces an interactive map of the ~900 *bureaux de vote* (voting p
 
 A scatter plot with an OLS regression line and Pearson *r* allows visual inspection of the correlation between social housing density and abstention rate. The map and chart are fully bidirectionally linked: clicking a precinct on the map highlights it in the chart, and vice versa.
 
+The project also includes:
+
+- **Grand Paris (Île-de-France) view** — toggle between the Paris precinct-level view and a commune-level view covering 1,200+ municipalities in the Île-de-France region.
+- **Scrollytelling narrative** — a guided 8-step story that automatically drives layer selection and map camera (Paris view only).
+- **2020 / 2026 comparison** — each precinct shows the change in abstention rate relative to the first round of the 2020 municipal elections (Phase 4c).
+- **Non-registered voter estimation** — real non-participation rate combining official abstentions with estimated non-registrants derived from INSEE RP 2021 (Phase 4d).
+- **Spatial regression** — OLS → LM diagnostic tests → SLM / SEM via `scripts/analysis.py` (Phase 4e), complemented by global Moran's I, LISA clustering, and K-means social typology (Phases 4a/4b).
+
 ## Research questions
 
 1. Is there a measurable spatial correlation between social housing density and abstention at the precinct level in Paris?
@@ -46,6 +54,10 @@ This definition has a well-known structural bias: it excludes residents who are 
 | IRIS income data | Median disposable income by IRIS unit (DISP_MED21, 2021) | INSEE Filosofi |
 | Social housing stock | Number of HLM units by IRIS unit (nbLsPls, 2024) | INSEE RPLS |
 | IRIS boundaries | Lambert-93 polygon layer for France | INSEE / IGN |
+| 2020 results *(optional)* | First-round 2020 abstention by precinct (historical comparison) | data.gouv.fr - Ministère de l'Intérieur |
+| RP 2021 *(optional)* | Eligible population (French citizens 18+) by IRIS for non-registrant estimation | INSEE Recensement de la Population 2021 |
+| IDF commune boundaries | Île-de-France commune polygons (Admin-Express COG) | IGN |
+| RPLS commune IDF | Social housing units by commune (data_RPLS2024_COM.csv) | INSEE RPLS |
 
 Note: 59 of 903 precincts have no `revenu_median` value because INSEE applies statistical secrecy rules (marked `"ns"` or `"nd"` in the source) to IRIS units with too few households. This is expected and unavoidable.
 
@@ -56,6 +68,12 @@ Note: 59 of 903 precincts have no `revenu_median` value because INSEE applies st
 **Population mismatch.** INSEE data describe the *entire resident population* (including foreigners, minors, and non-registered residents), while electoral data cover only *adult French citizens who are registered to vote*. The two denominators are structurally different (Riviere, 2012). Correlations should be interpreted with appropriate caution.
 
 **HLM density, not share.** The RPLS dataset provides the number of social housing units per IRIS, but not the total number of dwellings in the IRIS. It is therefore not possible to compute a share (HLM / total dwellings) without an additional source. The chosen indicator is **HLM density (units/km²)**, which measures concentration rather than share.
+
+**2020 / 2026 comparison (Phase 4c).** Precinct numbering in Paris Centre (arrondissements 1-4) changed between 2020 and 2026 due to the inter-arrondissement merger. The pipeline applies per-block offsets to re-align codes before the join.
+
+**Non-registered voter estimation (Phase 4d).** INSEE RP 2021 provides an estimate of the eligible voting population (French citizens aged 18+) by IRIS unit. The gap between this population and the registered voter count gives a lower bound on non-registrants, prorated to precinct level. The field `taux_non_inscription` combines official abstentions with estimated non-registrants to produce a real non-participation rate — a more accurate measure of political disengagement than the official figure.
+
+**Spatial regression (Phase 4e).** `scripts/analysis.py` runs OLS → LM diagnostic tests → SLM (spatial lag) or SEM (spatial error) depending on which test is significant. It also computes global Moran's I and LISA cluster indicators (Phase 4a) and a K-means social typology (Phase 4b). These analyses run as post-processing on the GeoJSON produced by `process.py`.
 
 ## Key results (first round, 2026)
 
@@ -80,19 +98,31 @@ City-wide abstention: median 37.9 %, Q1-Q4 range 35.8 %-45.6 %.
 pip install pandas geopandas shapely pyproj
 ```
 
-### 2. Download raw data
+Dependencies for `scripts/analysis.py` (`esda`, `libpysal`, `scikit-learn`, `spreg`) are installed automatically on first run if missing.
 
-Place files in `data/raw/` with the **exact subdirectory names and filenames** expected by `scripts/process.py`:
+### 2. Install Node.js dependencies
 
-| Expected path | Source |
-|---------------|--------|
-| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - Ministère de l'Intérieur |
-| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr |
-| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS |
-| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN - the script auto-detects the `.gpkg` in the first `CONTOURS-IRIS*` folder |
+```bash
+npm install
+```
 
-### 3. Run the pipeline
+### 3. Download raw data
+
+Place files in `data/raw/` with the **exact subdirectory names and filenames** expected by the scripts:
+
+| Expected path | Source | Required |
+|---------------|--------|----------|
+| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - Ministère de l'Intérieur | Yes |
+| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr | Yes |
+| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | Yes |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS (IRIS) | Yes |
+| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — script auto-detects the `.gpkg` in the first `CONTOURS-IRIS*` folder | Yes |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | No (Phase 4c) |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individuals file | No (Phase 4d) |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS (commune) | No (IDF view) |
+| `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG (commune boundaries) | No (IDF view) |
+
+### 4. Run the Paris pipeline
 
 ```bash
 python scripts/process.py
@@ -100,18 +130,37 @@ python scripts/process.py
 
 This produces:
 - `data/processed/paris_2026_t1.geojson` (pipeline output)
-- `web/data/processed/paris_2026_t1.geojson` (copied for the static frontend)
+- `web/public/data/processed/paris_2026_t1.geojson` (copied for the static frontend)
 
-The script also prints the Q1-Q4 breakpoints for the `BREAKS` variable in `web/index.html`. Copy them over if the data has changed.
-
-### 4. Serve locally
+### 5. Run the Île-de-France pipeline *(optional)*
 
 ```bash
-python -m http.server 8000 --directory web
-# then open http://localhost:8000
+python scripts/process_idf.py
 ```
 
-A local server is required because the browser fetches the GeoJSON via a relative path.
+Produces `web/public/data/processed/idf_2026_t1.geojson` (commune-level IDF data).
+
+### 6. Run spatial analysis *(optional)*
+
+```bash
+python scripts/analysis.py
+```
+
+Computes Moran's I, LISA, K-means, and spatial regression (OLS → SLM/SEM), enriching `data/processed/paris_2026_t1.geojson` with additional columns.
+
+### 7. Serve locally
+
+```bash
+npm run dev
+# then open http://localhost:5173
+```
+
+### 8. Build for production
+
+```bash
+npm run build
+# output is written to dist/
+```
 
 ---
 
@@ -122,7 +171,8 @@ The pipeline is deliberately structured so that each data source is loaded by an
 1. **Election results** - replace the CSV in `data/raw/premier_tour_resultat/`. Change the `Code commune` filter in `load_elections()` (currently `"75056"` for Paris). Adjust the `CANDIDATES` dictionary to match the *nuances* of the new election.
 2. **Precinct boundaries** - replace the GeoJSON in `data/raw/bureaux_vote/`. Update the column names used to build `join_key` in `load_bv()` to match the new file schema.
 3. **IRIS data** - the Filosofi and RPLS CSVs are France-wide; update only the `startswith("751")` filter in `load_revenus()`, `load_hlm()`, and `load_iris()` to match the INSEE commune codes of the new city (for example `"691"` for Lyon, `"132"` for Marseille).
-4. **Frontend** - update the `BREAKS` variable in `web/index.html` with the breakpoints printed by the pipeline. Update labels and candidate names in the sidebar HTML.
+4. **IDF view** - `scripts/process_idf.py` is a separate commune-level pipeline. Adapt the department filters in that script to target a different region.
+5. **Frontend** - candidate labels, colour breakpoints, and scrollytelling text live in `web/src/main.js` and `web/src/story.js`.
 
 ## References
 
@@ -137,9 +187,10 @@ The pipeline is deliberately structured so that each data source is loaded by an
 | Layer | Tool |
 |-------|------|
 | Data processing | Python · pandas · GeoPandas |
-| Interactive map | MapLibre GL JS (CDN) |
-| Statistical chart | D3.js v7 (CDN) |
-| Frontend | Native HTML/CSS/JS (single file) |
+| Spatial analysis | PySAL (esda, libpysal, spreg) · scikit-learn |
+| Interactive map | MapLibre GL JS v5 (npm) |
+| Statistical chart | D3.js v7 (npm) |
+| Frontend | Vite · ES modules |
 | Deployment | GitHub Pages |
 
 ## Project structure
@@ -147,15 +198,28 @@ The pipeline is deliberately structured so that each data source is loaded by an
 ```text
 socioelect-paris/
 ├── data/
-│   ├── raw/          # raw files (not versioned)
-│   └── processed/    # generated GeoJSON
+│   ├── raw/                    # raw files (not versioned)
+│   └── processed/              # generated GeoJSON files
 ├── scripts/
-│   └── process.py    # data pipeline
+│   ├── process.py              # Paris pipeline (voting precincts)
+│   ├── process_idf.py          # Grand Paris pipeline (IDF communes)
+│   └── analysis.py             # Moran's I, LISA, K-means, spatial regression
 ├── web/
-│   ├── index.html    # full frontend
-│   └── data/
-│       └── processed/
-│           └── paris_2026_t1.geojson   # committed for GitHub Pages
+│   ├── index.html              # HTML entry point
+│   ├── public/
+│   │   └── data/processed/     # GeoJSON files committed for GitHub Pages
+│   └── src/
+│       ├── main.js             # main orchestration
+│       ├── map.js              # MapLibre map
+│       ├── layers.js           # thematic layers
+│       ├── scatter.js          # D3 scatter plot
+│       ├── barchart.js         # D3 bar chart
+│       ├── story.js            # scrollytelling narrative
+│       ├── viewstate.js        # shared Paris / IDF state
+│       ├── utils.js            # utilities
+│       └── styles.css
+├── vite.config.js
+├── package.json
 └── README.md
 ```
 

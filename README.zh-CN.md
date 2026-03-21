@@ -21,6 +21,14 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 
 散点图配有 OLS 回归线和皮尔逊 *r* 系数，可直观呈现社会住房密度与弃权率的相关关系。地图与图表完全双向联动：在地图上点击投票站，该站会在图表中同步高亮，反之亦然。
 
+项目还提供以下功能：
+
+- **大巴黎（法兰西岛）视图** — 可在巴黎投票站视图与覆盖法兰西岛 1200+ 市镇的市镇级视图之间切换。
+- **滚动叙事** — 8 步导览故事，自动驱动地图图层切换和镜头移动（仅限巴黎视图）。
+- **2020 / 2026 对比** — 每个投票站展示与 2020 年市政选举第一轮相比的弃权率变化（第 4c 阶段）。
+- **未登记选民估算** — 基于 INSEE RP 2021 数据，将官方弃权人数与估算的未登记居民合并，计算真实未参与率（第 4d 阶段）。
+- **空间回归** — 通过 `scripts/analysis.py` 执行 OLS → LM 诊断检验 → SLM / SEM 空间回归（第 4e 阶段），并辅以 Moran's I 全局自相关、LISA 聚类和 K-means 社会类型分类（第 4a/4b 阶段）。
+
 ## 研究问题
 
 1. 在巴黎投票站层面，社会住房密度与弃权率之间是否存在可测量的空间相关性？
@@ -46,6 +54,10 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 | IRIS 收入数据 | 各 IRIS 单元可支配收入中位数（DISP_MED21，2021 年） | INSEE Filosofi |
 | 社会住房存量 | 各 IRIS 单元 HLM 套数（nbLsPls，2024 年） | INSEE RPLS |
 | IRIS 边界 | 全法国 Lambert-93 投影多边形图层 | INSEE / IGN |
+| 2020 年选举结果 *（可选）* | 2020 年第一轮各投票站弃权率（历史对比） | data.gouv.fr - 法国内政部 |
+| RP 2021 *（可选）* | 各 IRIS 单元符合投票条件人口（法国公民 18 岁以上），用于估算未登记选民 | INSEE 2021 年人口普查 |
+| 法兰西岛市镇边界 | 法兰西岛市镇多边形（Admin-Express COG） | IGN |
+| RPLS 市镇级数据 | 各市镇社会住房套数（data_RPLS2024_COM.csv） | INSEE RPLS |
 
 注：903 个投票站中有 59 个没有 `revenu_median` 值，因为 INSEE 会对住户数量过少的 IRIS 单元实施统计保密（源数据中标记为 `"ns"` 或 `"nd"`）。这是预期且不可避免的情况。
 
@@ -56,6 +68,12 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 **统计口径差异。** INSEE 数据描述的是*全部常住人口*（包含外国人、未成年人和未注册居民），而选举数据仅覆盖*已登记投票的成年法国公民*。两者分母在结构上不同（Riviere, 2012），因此相关性需要谨慎解释。
 
 **使用 HLM 密度，而非占比。** RPLS 数据集提供每个 IRIS 的社会住房套数，但不提供该 IRIS 的住房总量，因此无法在不引入额外数据源的情况下计算占比（HLM / 总住房）。本项目使用的是**HLM 密度（套/km²）**，用于衡量集中程度，而不是比例。
+
+**2020 / 2026 对比（第 4c 阶段）。** 由于 2020 年至 2026 年间巴黎中心区（第 1-4 区）的投票站重新编号，流程对各区块分别应用偏移量以对齐编号后再进行合并。
+
+**未登记选民估算（第 4d 阶段）。** INSEE RP 2021 数据可按 IRIS 单元估算符合投票条件的人口（法国公民 18 岁以上）。该人口与注册选民人数之差给出未登记人数的下界，并按比例分配至投票站级别。字段 `taux_non_inscription` 将官方弃权人数与估算未登记人数合并，生成真实未参与率——比官方指标更能反映真实的政治脱离程度。
+
+**空间回归（第 4e 阶段）。** `scripts/analysis.py` 依次执行 OLS → LM 诊断检验 → SLM（空间滞后模型）或 SEM（空间误差模型）。同时计算全局 Moran's I 和 LISA 聚类指标（第 4a 阶段）以及 K-means 社会类型分类（第 4b 阶段）。这些分析在 `process.py` 生成的 GeoJSON 基础上进行后处理。
 
 ## 关键结果（2026 年第一轮）
 
@@ -80,19 +98,31 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 pip install pandas geopandas shapely pyproj
 ```
 
-### 2. 下载原始数据
+`scripts/analysis.py` 所需的依赖（`esda`、`libpysal`、`scikit-learn`、`spreg`）会在首次运行时自动安装。
 
-将文件放入 `data/raw/`，并使用 `scripts/process.py` 预期的**精确子目录名和文件名**：
+### 2. 安装 Node.js 依赖
 
-| 期望路径 | 来源 |
-|----------|------|
-| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - 法国内政部 |
-| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr |
-| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS |
-| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN - 脚本会自动检测第一个 `CONTOURS-IRIS*` 目录中的 `.gpkg` 文件 |
+```bash
+npm install
+```
 
-### 3. 运行数据处理流程
+### 3. 下载原始数据
+
+将文件放入 `data/raw/`，并使用各脚本预期的**精确子目录名和文件名**：
+
+| 期望路径 | 来源 | 是否必须 |
+|----------|------|----------|
+| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - 法国内政部 | 是 |
+| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr | 是 |
+| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | 是 |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS（IRIS 级） | 是 |
+| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — 脚本自动检测第一个 `CONTOURS-IRIS*` 目录中的 `.gpkg` 文件 | 是 |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - 法国内政部 | 否（第 4c 阶段） |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 个人数据 | 否（第 4d 阶段） |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS（市镇级） | 否（法兰西岛视图） |
+| `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG（市镇边界） | 否（法兰西岛视图） |
+
+### 4. 运行巴黎数据处理流程
 
 ```bash
 python scripts/process.py
@@ -100,18 +130,37 @@ python scripts/process.py
 
 生成：
 - `data/processed/paris_2026_t1.geojson`（流程输出）
-- `web/data/processed/paris_2026_t1.geojson`（前端静态副本）
+- `web/public/data/processed/paris_2026_t1.geojson`（前端静态副本）
 
-如果数据发生变化，脚本还会打印 `web/index.html` 中 `BREAKS` 变量所需的 Q1-Q4 分段值。
-
-### 4. 本地启动
+### 5. 运行法兰西岛数据处理流程 *（可选）*
 
 ```bash
-python -m http.server 8000 --directory web
-# 然后打开 http://localhost:8000
+python scripts/process_idf.py
 ```
 
-必须使用本地服务器，因为浏览器会通过相对路径加载 GeoJSON 文件。
+生成 `web/public/data/processed/idf_2026_t1.geojson`（法兰西岛市镇级数据）。
+
+### 6. 运行空间分析 *（可选）*
+
+```bash
+python scripts/analysis.py
+```
+
+计算 Moran's I、LISA、K-means 和空间回归（OLS → SLM/SEM），并将结果列追加到 `data/processed/paris_2026_t1.geojson`。
+
+### 7. 本地启动
+
+```bash
+npm run dev
+# 然后打开 http://localhost:5173
+```
+
+### 8. 构建生产版本
+
+```bash
+npm run build
+# 输出文件生成至 dist/
+```
 
 ---
 
@@ -122,7 +171,8 @@ python -m http.server 8000 --directory web
 1. **选举结果** - 替换 `data/raw/premier_tour_resultat/` 中的 CSV。修改 `load_elections()` 里的 `Code commune` 过滤条件（巴黎当前为 `"75056"`）。再根据新选举的 *nuances* 调整 `CANDIDATES` 字典。
 2. **投票站边界** - 替换 `data/raw/bureaux_vote/` 中的 GeoJSON。更新 `load_bv()` 中用于构造 `join_key` 的列名，以匹配新文件结构。
 3. **IRIS 数据** - Filosofi 和 RPLS 的 CSV 都覆盖全法国；只需要在 `load_revenus()`、`load_hlm()` 和 `load_iris()` 中，把 `startswith("751")` 改成目标城市对应的 INSEE 代码前缀，例如里昂用 `"691"`，马赛用 `"132"`。
-4. **前端** - 用流程打印的断点值更新 `web/index.html` 中的 `BREAKS` 变量，并同步更新侧边栏中的标签和候选人姓名。
+4. **法兰西岛视图** - `scripts/process_idf.py` 是独立的市镇级流程，修改其中的省份过滤条件即可适配其他大区。
+5. **前端** - 候选人标签、颜色断点和滚动叙事文本位于 `web/src/main.js` 和 `web/src/story.js`。
 
 ## 参考文献
 
@@ -137,9 +187,10 @@ python -m http.server 8000 --directory web
 | 层级 | 工具 |
 |------|------|
 | 数据处理 | Python · pandas · GeoPandas |
-| 交互地图 | MapLibre GL JS (CDN) |
-| 统计图表 | D3.js v7 (CDN) |
-| 前端 | 原生 HTML/CSS/JS（单文件） |
+| 空间分析 | PySAL（esda、libpysal、spreg）· scikit-learn |
+| 交互地图 | MapLibre GL JS v5（npm） |
+| 统计图表 | D3.js v7（npm） |
+| 前端 | Vite · ES 模块 |
 | 部署 | GitHub Pages |
 
 ## 项目结构
@@ -147,15 +198,28 @@ python -m http.server 8000 --directory web
 ```text
 socioelect-paris/
 ├── data/
-│   ├── raw/          # 原始数据文件（不纳入版本控制）
-│   └── processed/    # 生成的 GeoJSON
+│   ├── raw/                    # 原始数据文件（不纳入版本控制）
+│   └── processed/              # 生成的 GeoJSON 文件
 ├── scripts/
-│   └── process.py    # 数据处理流程
+│   ├── process.py              # 巴黎流程（投票站级）
+│   ├── process_idf.py          # 大巴黎流程（法兰西岛市镇级）
+│   └── analysis.py             # Moran's I、LISA、K-means、空间回归
 ├── web/
-│   ├── index.html    # 完整前端
-│   └── data/
-│       └── processed/
-│           └── paris_2026_t1.geojson   # 为 GitHub Pages 提交的文件
+│   ├── index.html              # HTML 入口
+│   ├── public/
+│   │   └── data/processed/     # 为 GitHub Pages 提交的 GeoJSON 文件
+│   └── src/
+│       ├── main.js             # 主逻辑编排
+│       ├── map.js              # MapLibre 地图
+│       ├── layers.js           # 专题图层
+│       ├── scatter.js          # D3 散点图
+│       ├── barchart.js         # D3 条形图
+│       ├── story.js            # 滚动叙事
+│       ├── viewstate.js        # 巴黎 / 法兰西岛共享状态
+│       ├── utils.js            # 工具函数
+│       └── styles.css
+├── vite.config.js
+├── package.json
 └── README.md
 ```
 

@@ -21,6 +21,14 @@ Ce projet produit une carte interactive des ~900 bureaux de vote parisiens pour 
 
 Un nuage de points avec droite OLS et coefficient de Pearson *r* permet d'observer la corrélation entre densité HLM et taux d'abstention. La carte et le graphique sont entièrement liés : cliquer un bureau sur la carte le met en évidence dans le graphique, et réciproquement.
 
+Le projet propose également :
+
+- **Vue Grand Paris (Île-de-France)** — bascule entre la vue Paris (bureaux de vote) et une vue communale Île-de-France couvrant les 1 200+ communes de la région.
+- **Récit scrollytelling** — narration guidée en 8 étapes pilotant automatiquement la couche et le cadrage de la carte (vue Paris uniquement).
+- **Comparaison 2020 / 2026** — chaque bureau affiche l'évolution de l'abstention par rapport au premier tour des municipales 2020 (Phase 4c).
+- **Estimation des non-inscrits** — taux de non-participation réelle combinant abstentions et non-inscrits estimés à partir du RP 2021 INSEE (Phase 4d).
+- **Régression spatiale** — diagnostic OLS → tests LM → SLM / SEM via `scripts/analysis.py` (Phase 4e), complété par l'autocorrélation spatiale Moran's I, LISA et classification K-means (Phases 4a/4b).
+
 ## Questions de recherche
 
 1. Existe-t-il une corrélation spatiale mesurable entre densité de logements sociaux et abstention à l'échelle des bureaux de vote parisiens ?
@@ -46,6 +54,10 @@ Cette définition présente un biais structurel connu : elle exclut les résiden
 | Revenus IRIS | Revenu disponible médian par IRIS (DISP_MED21, 2021) | INSEE Filosofi |
 | Logements sociaux | Nombre de HLM par IRIS (nbLsPls, 2024) | INSEE RPLS |
 | Contours IRIS | Couche Lambert-93 pour la France entière | INSEE / IGN |
+| Résultats 2020 *(optionnel)* | Abstention du T1 2020 par bureau (comparaison historique) | data.gouv.fr - Ministère de l'Intérieur |
+| RP 2021 *(optionnel)* | Population éligible (Français 18+) par IRIS pour estimer les non-inscrits | INSEE Recensement de la Population 2021 |
+| Contours communes IDF | Polygones communes Île-de-France (Admin-Express COG) | IGN |
+| RPLS commune IDF | Logements sociaux par commune (data_RPLS2024_COM.csv) | INSEE RPLS |
 
 Note : 59 des 903 bureaux n'ont pas de valeur `revenu_median` car l'INSEE applique le secret statistique (indicateur `"ns"` ou `"nd"`) aux IRIS comprenant trop peu de ménages. C'est attendu et inévitable.
 
@@ -56,6 +68,12 @@ Note : 59 des 903 bureaux n'ont pas de valeur `revenu_median` car l'INSEE appliq
 **Décalage de populations.** Les données INSEE décrivent l'*ensemble de la population résidente* (étrangers, mineurs, non-inscrits inclus), tandis que les données électorales ne couvrent que les citoyens français adultes inscrits. Les deux dénominateurs sont structurellement différents (Rivière, 2012). Les corrélations doivent donc être interprétées avec prudence.
 
 **Densité HLM, pas part.** Le fichier RPLS donne le nombre de logements sociaux par IRIS, mais pas le nombre total de logements dans l'IRIS. Il n'est donc pas possible de calculer une part (HLM / total logements) sans source supplémentaire. L'indicateur retenu est la **densité HLM (unités/km²)**, qui mesure la concentration plutôt que la proportion.
+
+**Comparaison 2020 / 2026 (Phase 4c).** Le numérotation des bureaux du Paris Centre (arr. 1-4) a changé entre 2020 et 2026 en raison du regroupement des arrondissements. Le pipeline applique des décalages par bloc d'arrondissement pour rétablir la concordance avant la fusion.
+
+**Estimation des non-inscrits (Phase 4d).** Le RP 2021 INSEE permet d'estimer la population éligible au vote (Français 18+) par IRIS. La différence entre cette population et le nombre d'inscrits donne une borne basse du nombre de non-inscrits, proratisée au niveau bureau de vote. Le champ `taux_non_inscription` combine abstentions et non-inscrits estimés pour fournir un taux de non-participation réelle — plus représentatif du décrochage politique effectif que le taux officiel.
+
+**Régression spatiale (Phase 4e).** `scripts/analysis.py` effectue un enchaînement OLS → tests diagnostiques LM (Lagrange Multiplier) → modèle SLM (spatial lag) ou SEM (spatial error) selon la significativité des tests. Il produit également l'autocorrélation globale de Moran's I (Phase 4a) et une classification K-means des bureaux (Phase 4b). Ces analyses s'effectuent en post-traitement sur le GeoJSON généré par `process.py`.
 
 ## Résultats clés (premier tour, 2026)
 
@@ -80,38 +98,69 @@ Abstention ville entière : médiane 37,9 %, plage Q1-Q4 : 35,8 %-45,6 %.
 pip install pandas geopandas shapely pyproj
 ```
 
-### 2. Télécharger les données brutes
+Les dépendances de `scripts/analysis.py` (`esda`, `libpysal`, `scikit-learn`, `spreg`) sont installées automatiquement à la première exécution si elles sont absentes.
 
-Placer les fichiers dans `data/raw/` avec les **noms de sous-dossiers et noms de fichiers exacts** attendus par `scripts/process.py` :
+### 2. Installer les dépendances Node.js
 
-| Chemin attendu | Source |
-|----------------|--------|
-| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - Ministère de l'Intérieur |
-| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr |
-| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS |
-| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN - le script détecte automatiquement le `.gpkg` dans le premier dossier `CONTOURS-IRIS*` |
+```bash
+npm install
+```
 
-### 3. Traiter les données
+### 3. Télécharger les données brutes
+
+Placer les fichiers dans `data/raw/` avec les **noms de sous-dossiers et noms de fichiers exacts** attendus par les scripts :
+
+| Chemin attendu | Source | Obligatoire |
+|----------------|--------|-------------|
+| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - Ministère de l'Intérieur | Oui |
+| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr | Oui |
+| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | Oui |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS (IRIS) | Oui |
+| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — le script détecte automatiquement le `.gpkg` dans le premier dossier `CONTOURS-IRIS*` | Oui |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | Non (Phase 4c) |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individus | Non (Phase 4d) |
+| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS (commune) | Non (vue IDF) |
+| `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG (contours communes) | Non (vue IDF) |
+
+### 4. Traiter les données Paris
 
 ```bash
 python scripts/process.py
 ```
 
-Genere :
+Génère :
 - `data/processed/paris_2026_t1.geojson` (sortie pipeline)
-- `web/data/processed/paris_2026_t1.geojson` (copie pour le frontend)
+- `web/public/data/processed/paris_2026_t1.geojson` (copie pour le frontend)
 
-Le script affiche également les breakpoints Q1-Q4 à copier dans la variable `BREAKS` de `web/index.html` si les données ont changé.
-
-### 4. Servir localement
+### 5. Traiter les données Île-de-France *(optionnel)*
 
 ```bash
-python -m http.server 8000 --directory web
-# puis ouvrir http://localhost:8000
+python scripts/process_idf.py
 ```
 
-Un serveur local est nécessaire car le navigateur charge le GeoJSON via un chemin relatif.
+Génère `web/public/data/processed/idf_2026_t1.geojson` (communes IDF).
+
+### 6. Lancer les analyses spatiales *(optionnel)*
+
+```bash
+python scripts/analysis.py
+```
+
+Calcule Moran's I, LISA, K-means et la régression spatiale (OLS → SLM/SEM) et enrichit `data/processed/paris_2026_t1.geojson` avec les colonnes correspondantes.
+
+### 7. Servir localement
+
+```bash
+npm run dev
+# puis ouvrir http://localhost:5173
+```
+
+### 8. Construire pour la production
+
+```bash
+npm run build
+# les fichiers sont générés dans dist/
+```
 
 ---
 
@@ -122,7 +171,8 @@ Le pipeline est structuré de façon à ce que chaque source de données soit ch
 1. **Résultats électoraux** - remplacer le CSV dans `data/raw/premier_tour_resultat/`. Modifier le filtre `Code commune` dans `load_elections()` (actuellement `"75056"` pour Paris). Adapter le dictionnaire `CANDIDATES` aux *nuances* de la nouvelle élection.
 2. **Géographie des bureaux de vote** - remplacer le GeoJSON dans `data/raw/bureaux_vote/`. Mettre à jour les noms de colonnes utilisés pour construire `join_key` dans `load_bv()`.
 3. **Données IRIS** - les CSV Filosofi et RPLS couvrent la France entière ; modifier uniquement le filtre `startswith("751")` dans `load_revenus()`, `load_hlm()` et `load_iris()` selon les codes INSEE de la nouvelle commune (ex. `"691"` pour Lyon, `"132"` pour Marseille).
-4. **Frontend** - mettre à jour la variable `BREAKS` dans `web/index.html` avec les breakpoints affichés par le pipeline. Mettre à jour les libellés et les noms de candidats dans le HTML.
+4. **Vue IDF** - `scripts/process_idf.py` est un pipeline séparé à l'échelle communale. Adapter les filtres de département dans ce script pour couvrir une autre région.
+5. **Frontend** - les libellés des candidats, les niveaux de couleur et les textes du récit scrollytelling se trouvent dans `web/src/main.js` et `web/src/story.js`.
 
 ## Références
 
@@ -137,9 +187,10 @@ Le pipeline est structuré de façon à ce que chaque source de données soit ch
 | Couche | Outil |
 |--------|-------|
 | Traitement des données | Python · pandas · GeoPandas |
-| Carte interactive | MapLibre GL JS (CDN) |
-| Graphique statistique | D3.js v7 (CDN) |
-| Frontend | HTML/CSS/JS natif (fichier unique) |
+| Analyse spatiale | PySAL (esda, libpysal, spreg) · scikit-learn |
+| Carte interactive | MapLibre GL JS v5 (npm) |
+| Graphique statistique | D3.js v7 (npm) |
+| Frontend | Vite · ES modules |
 | Déploiement | GitHub Pages |
 
 ## Structure du projet
@@ -147,15 +198,28 @@ Le pipeline est structuré de façon à ce que chaque source de données soit ch
 ```text
 socioelect-paris/
 ├── data/
-│   ├── raw/          # fichiers bruts (non versionnés)
-│   └── processed/    # GeoJSON généré
+│   ├── raw/                    # fichiers bruts (non versionnés)
+│   └── processed/              # GeoJSON générés
 ├── scripts/
-│   └── process.py    # pipeline de traitement
+│   ├── process.py              # pipeline Paris (bureaux de vote)
+│   ├── process_idf.py          # pipeline Grand Paris (communes IDF)
+│   └── analysis.py             # Moran's I, LISA, K-means, régression spatiale
 ├── web/
-│   ├── index.html    # frontend complet
-│   └── data/
-│       └── processed/
-│           └── paris_2026_t1.geojson   # versionnée pour GitHub Pages
+│   ├── index.html              # point d'entrée HTML
+│   ├── public/
+│   │   └── data/processed/     # GeoJSON versionnés pour GitHub Pages
+│   └── src/
+│       ├── main.js             # orchestration principale
+│       ├── map.js              # carte MapLibre
+│       ├── layers.js           # couches thématiques
+│       ├── scatter.js          # nuage de points D3
+│       ├── barchart.js         # histogramme D3
+│       ├── story.js            # récit scrollytelling
+│       ├── viewstate.js        # état partagé Paris / IDF
+│       ├── utils.js            # utilitaires
+│       └── styles.css
+├── vite.config.js
+├── package.json
 └── README.md
 ```
 
