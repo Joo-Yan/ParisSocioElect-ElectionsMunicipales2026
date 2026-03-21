@@ -26,6 +26,8 @@ WEB_OUTPUT    = os.path.join(WEB_PROCESSED, "paris_2026_t1.geojson")
 
 ELECTIONS_CSV = os.path.join(RAW, "premier_tour_resultat",
     "municipales-2026-resultats-bv-par-communes-2026-03-16.csv")
+ELECTIONS_2020_TXT = os.path.join(RAW, "premier_tour_resultat",
+    "municipales-2020-resultats-bv-t1-france.txt")
 BV_GEOJSON    = os.path.join(RAW, "bureaux_vote",
     "secteurs-des-bureaux-de-vote-2026.geojson")
 FILO_CSV      = os.path.join(RAW, "BASE_TD_FILO_IRIS_2021_DISP_CSV",
@@ -204,6 +206,60 @@ def load_hlm(gdf_iris):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 4c. Données 2020 — abstention pour comparaison historique
+# ══════════════════════════════════════════════════════════════════════════════
+
+# BV Paris Centre (arr 1-4) renumbered between 2020 and 2026.
+# Pattern: 2026_code = 2020_code + offset, applied per arrondissement block.
+_PARIS_CENTRE_OFFSETS = {
+    "02": 10,  # 2020: 0201-0210 → 2026: 0211-0220
+    "03": 20,  # 2020: 0301-0315 → 2026: 0321-0335
+    "04": 35,  # 2020: 0401-0414 → 2026: 0436-0449
+}
+
+
+def _bv2020_to_2026(code: str) -> str:
+    """Map a 2020 BV code (zero-padded to 4 digits) to its 2026 equivalent."""
+    arr_prefix = code[:2]
+    offset = _PARIS_CENTRE_OFFSETS.get(arr_prefix)
+    if offset is None:
+        return code
+    num = int(code[2:]) + offset
+    return f"{arr_prefix}{num:02d}"
+
+
+def load_elections_2020():
+    """Load 2020 T1 BV-level abstention for Paris only."""
+    if not os.path.exists(ELECTIONS_2020_TXT):
+        print("[4c] Fichier 2020 introuvable — skip comparaison historique")
+        return None
+
+    print("[4c] Élections 2020 Paris (abstention)…")
+    df = pd.read_csv(ELECTIONS_2020_TXT, sep="\t", encoding="latin-1", low_memory=False)
+
+    paris = df[df.iloc[:, 0].astype(str).str.strip() == "75"].copy()
+    paris["code_bv_2020"] = paris["Code B.Vote"].astype(str).str.zfill(4)
+
+    # Map to 2026 codes
+    paris["join_key"] = paris["code_bv_2020"].apply(_bv2020_to_2026)
+
+    # Abstention: column "% Abs/Ins" is stored as French decimal string ("56,25")
+    paris["taux_abstention_2020"] = (
+        paris["% Abs/Ins"].astype(str).str.replace(",", ".", regex=False)
+        .pipe(pd.to_numeric, errors="coerce")
+        .round(2)
+    )
+
+    result = paris[["join_key", "taux_abstention_2020"]].dropna()
+    n_mapped = len(result)
+    print(f"  {len(paris)} BV Paris 2020 → {n_mapped} avec abstention valide")
+    print(f"  taux_abstention_2020 — min={result['taux_abstention_2020'].min():.1f}%  "
+          f"med={result['taux_abstention_2020'].median():.1f}%  "
+          f"max={result['taux_abstention_2020'].max():.1f}%")
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 6. Jointure centroïde : BV → IRIS
 # ══════════════════════════════════════════════════════════════════════════════
 def centroid_join(gdf_bv_2154, gdf_iris_2154):
@@ -253,6 +309,7 @@ def main():
 
     # Chargement
     df_elec    = load_elections()
+    df_elec_20 = load_elections_2020()
     gdf_bv     = load_bv()           # EPSG:4326
     gdf_iris   = load_iris()         # EPSG:2154
     df_rev     = load_revenus()
@@ -282,13 +339,28 @@ def main():
     gdf = gdf.merge(df_rev, on="CODE_IRIS", how="left")
     gdf = gdf.merge(df_hlm, on="CODE_IRIS", how="left")
 
+    # Fusion données 2020 et calcul delta abstention
+    if df_elec_20 is not None:
+        gdf = gdf.merge(df_elec_20, on="join_key", how="left")
+        gdf["delta_abstention"] = (
+            gdf["taux_abstention"] - gdf["taux_abstention_2020"]
+        ).round(2)
+        n_with_2020 = gdf["taux_abstention_2020"].notna().sum()
+        print(f"\n[4c] Couverture historique : {n_with_2020}/{len(gdf)} BV "
+              f"({n_with_2020/len(gdf)*100:.1f}%)")
+        print(f"  delta_abstention — "
+              f"min={gdf['delta_abstention'].min():.1f}  "
+              f"med={gdf['delta_abstention'].median():.1f}  "
+              f"max={gdf['delta_abstention'].max():.1f} pts")
+
     # Champs finaux pour le frontend
     pct_cols = list(CANDIDATES.keys()) + ["pct_autres"]
+    hist_cols = ["taux_abstention_2020", "delta_abstention"] if df_elec_20 is not None else []
     keep = [
         "geometry", "join_key", "arrondissement_label",
         "inscrits", "abstentions", "taux_abstention",
         "revenu_median", "n_hlm", "hlm_density",
-    ] + pct_cols
+    ] + pct_cols + hist_cols
 
     keep = [c for c in keep if c in gdf.columns]
     gdf_out = gdf[keep].rename(columns={
@@ -325,7 +397,7 @@ def main():
         print(f"  {label}: Q1={q[0]}  Q2={q[1]}  Q3={q[2]}  Q4={q[3]}")
 
     print("\n── Couverture des champs ───────────────────────────────────────────")
-    for col in ["taux_abstention", "revenu_median", "hlm_density"] + pct_cols:
+    for col in ["taux_abstention", "revenu_median", "hlm_density"] + pct_cols + hist_cols:
         if col not in gdf_out.columns:
             continue
         s = gdf_out[col]

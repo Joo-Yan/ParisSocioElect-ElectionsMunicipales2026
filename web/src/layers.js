@@ -4,15 +4,19 @@ import * as d3 from 'd3';
 // COLOR SCALES — static per layer
 // ═══════════════════════════════════════════════════════════
 export const COLORS = {
-  abstention: ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
-  revenu:     ['#edf8fb','#b3cde3','#8c96c6','#8856a7','#810f7c'],
-  hlm:        ['#ffffcc','#c2e699','#78c679','#31a354','#006837'],
-  gregoire:   ['#fce4f3','#f4a8d4','#ec6db5','#d41880','#9d005d'],
-  dati:       ['#dde8ff','#99b8ec','#5585d8','#1a5cb8','#0a2f70'],
-  chikirou:   ['#ffe5e5','#ffaaaa','#ee5555','#cc0000','#840000'],
-  bournazel:  ['#fff3e0','#ffcc80','#ffa040','#e07b00','#904000'],
-  knafo:      ['#dde8f5','#90b8d8','#4d88b8','#1e5f8a','#0a3050'],
-  autres:     ['#f0f0f0','#d0d0d0','#a0a0a0','#6b6b6b','#404040']
+  abstention:          ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
+  revenu:              ['#edf8fb','#b3cde3','#8c96c6','#8856a7','#810f7c'],
+  hlm:                 ['#ffffcc','#c2e699','#78c679','#31a354','#006837'],
+  gregoire:            ['#fce4f3','#f4a8d4','#ec6db5','#d41880','#9d005d'],
+  dati:                ['#dde8ff','#99b8ec','#5585d8','#1a5cb8','#0a2f70'],
+  chikirou:            ['#ffe5e5','#ffaaaa','#ee5555','#cc0000','#840000'],
+  bournazel:           ['#fff3e0','#ffcc80','#ffa040','#e07b00','#904000'],
+  knafo:               ['#dde8f5','#90b8d8','#4d88b8','#1e5f8a','#0a3050'],
+  autres:              ['#f0f0f0','#d0d0d0','#a0a0a0','#6b6b6b','#404040'],
+  // Historical comparison (same scale as abstention for 2020)
+  abstention_2020:     ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
+  // Delta: blue (big drop) → grey → red (small drop / increase)
+  delta_abstention:    ['#2166ac','#92c5de','#f7f7f7','#f4a582','#d6604d'],
 };
 
 export const IDF_COLORS = {
@@ -58,6 +62,9 @@ export const LAYER_META = {
   lisa_revenu:     { field: 'lisa_revenu_median',   label: 'LISA · Revenu',        shortLabel: 'LISA Revenu',     unit: '',  decimals: 0, categorical: true },
   lisa_hlm:        { field: 'lisa_hlm_density',     label: 'LISA · HLM',           shortLabel: 'LISA HLM',        unit: '',  decimals: 0, categorical: true },
   cluster:         { field: 'cluster_id',           label: 'Typologie sociale',    shortLabel: 'Clusters',        unit: '',  decimals: 0, categorical: true },
+  // Historical comparison 2020 vs 2026
+  abstention_2020:  { field: 'taux_abstention_2020', label: 'Abstention 2020 (%)',  shortLabel: 'Abstention 2020', unit: '%', decimals: 1 },
+  delta_abstention: { field: 'delta_abstention',     label: 'Évolution abstention (2020→2026, pts)', shortLabel: 'Δ Abstention', unit: ' pts', decimals: 1 },
 };
 
 export const IDF_LAYER_META = {
@@ -108,12 +115,14 @@ export const VIEW_CONFIG = {
       { title: 'Socio-éco',        keys: ['abstention','revenu','hlm'] },
       { title: 'Candidats',        keys: ['gregoire','dati','chikirou','bournazel','knafo','autres'] },
       { title: 'Analyse spatiale', keys: ['lisa_abstention','lisa_revenu','lisa_hlm','cluster'] },
+      { title: 'Historique',       keys: ['abstention_2020','delta_abstention'] },
     ],
     csvFields: [
       'code_bv', 'arrondissement', 'inscrits',
       'taux_abstention', 'revenu_median', 'hlm_density', 'n_hlm',
       'pct_gregoire', 'pct_dati', 'pct_chikirou', 'pct_bournazel', 'pct_knafo', 'pct_autres',
-      'lisa_taux_abstention', 'lisa_revenu_median', 'lisa_hlm_density', 'cluster_id'
+      'lisa_taux_abstention', 'lisa_revenu_median', 'lisa_hlm_density', 'cluster_id',
+      'taux_abstention_2020', 'delta_abstention'
     ],
     csvFilename: 'socioelect_paris_donnees.csv',
   },

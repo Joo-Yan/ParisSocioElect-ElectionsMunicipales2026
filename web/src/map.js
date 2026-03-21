@@ -259,7 +259,10 @@ function buildParisTooltip(props) {
   return `
     <div class="tip-title">BV ${props.code_bv}${props.arrondissement ? ' · ' + props.arrondissement : ''}</div>
     <div class="tip-row"><span class="tip-label">Inscrits</span><span class="tip-val">${fmt(props.inscrits, 0)}</span></div>
-    <div class="tip-row"><span class="tip-label">Abstention</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
+    <div class="tip-row"><span class="tip-label">Abstention 2026</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
+    ${props.taux_abstention_2020 != null && props.taux_abstention_2020 !== 'null' ? `
+    <div class="tip-row"><span class="tip-label">Abstention 2020</span><span class="tip-val">${fmt(props.taux_abstention_2020)} %</span></div>
+    <div class="tip-row"><span class="tip-label">Évolution</span><span class="tip-val" style="color:${+props.delta_abstention > 0 ? '#f4a582' : '#92c5de'}">${+props.delta_abstention > 0 ? '+' : ''}${fmt(props.delta_abstention)} pts</span></div>` : ''}
     <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
     <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
     ${candidatesHtml}
