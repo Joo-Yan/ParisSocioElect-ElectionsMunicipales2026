@@ -66,6 +66,35 @@ body {
   font-size: 16px;
   font-weight: 200;
 }
+/* View toggle (segmented control) */
+#view-toggle {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+#view-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+#view-toggle button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+#view-toggle button:hover:not(.active) {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+}
+
 #header-spacer { flex: 1; }
 #header-badge {
   font-size: 10px;
@@ -406,6 +435,8 @@ body {
     align-items: flex-start;
   }
   #header .sep, #header-spacer, #header-badge { display: none; }
+  #view-toggle { width: 100%; order: 1; }
+  #view-toggle button { flex: 1; }
   #header h1 {
     width: 100%;
     font-size: 13px;

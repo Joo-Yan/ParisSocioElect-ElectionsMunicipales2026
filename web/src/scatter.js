@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { LAYER_META } from './layers.js';
+import { viewConfig } from './viewstate.js';
 import { ols, pearsonR, formatAxisTick, isMobileLayout } from './utils.js';
 import { flyToFeature } from './map.js';
 
@@ -18,24 +18,44 @@ export function setScatterAxes(x, y) {
   scatterYLayer = y;
 }
 
+export function resetScatterAxes(x, y) {
+  scatterXLayer = x || 'hlm';
+  scatterYLayer = y || 'abstention';
+}
+
 export function updateScatterHeader() {
-  const xMeta = LAYER_META[scatterXLayer];
-  const yMeta = LAYER_META[scatterYLayer];
-  document.querySelector('#chart-header h2').textContent =
-    `${xMeta.shortLabel} × ${yMeta.shortLabel}`;
+  const vcfg = viewConfig;
+  const lm = vcfg.layerMeta;
+  const xMeta = lm[scatterXLayer];
+  const yMeta = lm[scatterYLayer];
+  if (xMeta && yMeta) {
+    document.querySelector('#chart-header h2').textContent =
+      `${xMeta.shortLabel} × ${yMeta.shortLabel}`;
+  }
+  document.querySelector('#chart-header p').textContent =
+    `Chaque point = 1 ${vcfg.unitLabel} · couleur = ${vcfg.groupLabel}`;
 }
 
 export function populateAxisSelectors(onChangeCallback) {
+  const vcfg = viewConfig;
+  const layers = Object.keys(vcfg.layerMeta).filter(k => !vcfg.layerMeta[k].categorical);
+
+  // Clone-replace selects to strip any previous change listeners
+  ['x-axis-select', 'y-axis-select'].forEach(id => {
+    const old = document.getElementById(id);
+    const fresh = old.cloneNode(false);
+    old.parentNode.replaceChild(fresh, old);
+  });
+
   const xSelect = document.getElementById('x-axis-select');
   const ySelect = document.getElementById('y-axis-select');
-  const layers = Object.keys(LAYER_META).filter(k => !LAYER_META[k].categorical);
 
   [xSelect, ySelect].forEach(select => {
     select.innerHTML = '';
     layers.forEach(layer => {
       const opt = document.createElement('option');
       opt.value = layer;
-      opt.textContent = LAYER_META[layer].shortLabel;
+      opt.textContent = vcfg.layerMeta[layer].shortLabel;
       select.appendChild(opt);
     });
   });
@@ -59,11 +79,13 @@ export function populateAxisSelectors(onChangeCallback) {
 export function initScatter(data, { mobileChartCollapsed } = {}) {
   if (isMobileLayout() && mobileChartCollapsed) return;
 
+  const vcfg = viewConfig;
   const container = document.getElementById('scatter-container');
   const W = container.clientWidth;
   const H = container.clientHeight;
-  const xMeta = LAYER_META[scatterXLayer];
-  const yMeta = LAYER_META[scatterYLayer];
+  const xMeta = vcfg.layerMeta[scatterXLayer];
+  const yMeta = vcfg.layerMeta[scatterYLayer];
+  if (!xMeta || !yMeta) return;
 
   const margin = { top: 20, right: 20, bottom: 50, left: 52 };
   const width  = W - margin.left - margin.right;
@@ -82,8 +104,9 @@ export function initScatter(data, { mobileChartCollapsed } = {}) {
   const xScale = d3.scaleLinear().domain([0, xMax]).range([0, width]);
   const yScale = d3.scaleLinear().domain([0, yMax]).range([height, 0]);
 
-  const arrondissements = [...new Set(features.map(f => f.properties.arrondissement))].sort();
-  const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(arrondissements);
+  const groupField = vcfg.groupField;
+  const groups = [...new Set(features.map(f => f.properties[groupField]))].sort();
+  const colorScale = d3.scaleOrdinal(d3.schemeTableau10).domain(groups);
 
   const svgEl = d3.select('#scatter');
   svgEl.attr('width', W).attr('height', H);
@@ -150,13 +173,14 @@ export function initScatter(data, { mobileChartCollapsed } = {}) {
   }
 
   // Data points
+  const idField = vcfg.idField;
   scatterCircles = g.selectAll('circle')
     .data(features)
     .join('circle')
     .attr('cx', f => xScale(+f.properties[xMeta.field]))
     .attr('cy', f => yScale(+f.properties[yMeta.field]))
     .attr('r', 3.5)
-    .attr('fill', f => colorScale(f.properties.arrondissement))
+    .attr('fill', f => colorScale(f.properties[groupField]))
     .attr('opacity', 0.65)
     .attr('stroke', 'none')
     .style('cursor', 'crosshair');
@@ -164,7 +188,7 @@ export function initScatter(data, { mobileChartCollapsed } = {}) {
   // Scatter hover → map highlight
   scatterCircles
     .on('mouseover', (event, f) => {
-      highlightScatterPoint(f.properties.code_bv);
+      highlightScatterPoint(f.properties[idField]);
       flyToFeature(f);
     })
     .on('mouseout', () => resetScatterHighlight());
@@ -173,14 +197,16 @@ export function initScatter(data, { mobileChartCollapsed } = {}) {
   document.getElementById('stat-r2').textContent = r2.toFixed(3);
   document.getElementById('stat-r').textContent  = r.toFixed(3);
   document.getElementById('stat-n').textContent  = features.length;
+  document.getElementById('stat-n-label').textContent = `n ${vcfg.unitLabel}s`;
 }
 
-export function highlightScatterPoint(codeBv) {
+export function highlightScatterPoint(featureId) {
   if (!scatterCircles) return;
+  const idField = viewConfig.idField;
   scatterCircles
-    .attr('r', f => f.properties.code_bv === codeBv ? 7 : 3)
-    .attr('opacity', f => f.properties.code_bv === codeBv ? 1 : 0.2)
-    .attr('stroke', f => f.properties.code_bv === codeBv ? '#ffffff' : 'none')
+    .attr('r', f => f.properties[idField] === featureId ? 7 : 3)
+    .attr('opacity', f => f.properties[idField] === featureId ? 1 : 0.2)
+    .attr('stroke', f => f.properties[idField] === featureId ? '#ffffff' : 'none')
     .attr('stroke-width', 1.5);
 }
 
@@ -192,12 +218,13 @@ export function resetScatterHighlight() {
     .attr('stroke', 'none');
 }
 
-export function highlightScatterArrondissement(arrondissement) {
+export function highlightScatterGroup(groupValue) {
   if (!scatterCircles) return;
+  const groupField = viewConfig.groupField;
   scatterCircles
-    .attr('r', f => f.properties.arrondissement === arrondissement ? 5 : 2.5)
-    .attr('opacity', f => f.properties.arrondissement === arrondissement ? 1 : 0.15)
-    .attr('stroke', f => f.properties.arrondissement === arrondissement ? '#ffffff' : 'none')
+    .attr('r', f => f.properties[groupField] === groupValue ? 5 : 2.5)
+    .attr('opacity', f => f.properties[groupField] === groupValue ? 1 : 0.15)
+    .attr('stroke', f => f.properties[groupField] === groupValue ? '#ffffff' : 'none')
     .attr('stroke-width', 1);
 }
 

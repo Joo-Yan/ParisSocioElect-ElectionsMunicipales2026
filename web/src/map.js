@@ -1,18 +1,25 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { COLORS, BREAKS, LAYER_META, PARTY_META, LISA_COLORS, CLUSTER_COLORS } from './layers.js';
+import { BREAKS, LISA_COLORS, CLUSTER_COLORS } from './layers.js';
+import { viewConfig, currentView } from './viewstate.js';
 import { formatValue } from './utils.js';
 
 let map;
-let hoveredBvId = null;
+let hoveredId = null;
+let _onMouseMove  = null;
+let _onMouseLeave = null;
+
+const SOURCE_NAME = 'features';
+const FILL_LAYER  = 'feat-fill';
+const LINE_LAYER  = 'feat-outline';
 
 // Callbacks set by main.js for cross-module coordination
-let onHoverBv = null;
-let onLeaveBv = null;
+let onHoverFeature = null;
+let onLeaveFeature = null;
 
 export function setMapCallbacks({ onHover, onLeave }) {
-  onHoverBv = onHover;
-  onLeaveBv = onLeave;
+  onHoverFeature = onHover;
+  onLeaveFeature = onLeave;
 }
 
 export function getMap() {
@@ -25,7 +32,7 @@ export function initMap() {
     style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
     center: [2.3522, 48.8566],
     zoom: 11.2,
-    minZoom: 10,
+    minZoom: 8,
     maxZoom: 16,
     preserveDrawingBuffer: true
   });
@@ -34,37 +41,37 @@ export function initMap() {
 }
 
 export function buildColorExpr(layer) {
-  const meta = LAYER_META[layer];
+  const vcfg = viewConfig;
+  const meta = vcfg.layerMeta[layer];
+  if (!meta) return '#555555';
   const { field } = meta;
 
-  // Categorical layers: LISA and cluster
+  // Categorical layers: LISA and cluster (Paris only)
   if (meta.categorical) {
     if (layer.startsWith('lisa_')) {
-      // LISA: match string values HH/HL/LH/LL/NS
       return [
         'match', ['get', field],
         'HH', LISA_COLORS.HH,
         'HL', LISA_COLORS.HL,
         'LH', LISA_COLORS.LH,
         'LL', LISA_COLORS.LL,
-        LISA_COLORS.NS  // default (NS or missing)
+        LISA_COLORS.NS
       ];
     }
     if (layer === 'cluster') {
-      // Cluster: match numeric IDs to colors
       const matchExpr = ['match', ['get', field]];
       for (let i = 0; i < CLUSTER_COLORS.length; i++) {
         matchExpr.push(i, CLUSTER_COLORS[i]);
       }
-      matchExpr.push('#404040'); // default
+      matchExpr.push('#404040');
       return matchExpr;
     }
   }
 
   // Quantile layers: use step expression with computed breaks
-  const colors = COLORS[layer];
+  const colors = vcfg.colors[layer];
   const b      = BREAKS[layer];
-  if (!b) return '#555555';
+  if (!colors || !b) return '#555555';
   return [
     'case',
     ['==', ['get', field], null], '#555555',
@@ -74,22 +81,34 @@ export function buildColorExpr(layer) {
   ];
 }
 
+export function clearDataLayers() {
+  if (_onMouseMove)  map.off('mousemove',  FILL_LAYER, _onMouseMove);
+  if (_onMouseLeave) map.off('mouseleave', FILL_LAYER, _onMouseLeave);
+  _onMouseMove = _onMouseLeave = null;
+  if (map.getLayer(FILL_LAYER))   map.removeLayer(FILL_LAYER);
+  if (map.getLayer(LINE_LAYER))   map.removeLayer(LINE_LAYER);
+  if (map.getSource(SOURCE_NAME)) map.removeSource(SOURCE_NAME);
+  hoveredId = null;
+  document.getElementById('tooltip').style.display = 'none';
+  if (onLeaveFeature) onLeaveFeature();
+}
+
 export function addDataLayers(data) {
   const featuresWithId = {
     ...data,
     features: data.features.map((f, i) => ({ ...f, id: i }))
   };
 
-  map.addSource('bureaux-vote', {
+  map.addSource(SOURCE_NAME, {
     type: 'geojson',
     data: featuresWithId,
     generateId: false
   });
 
   map.addLayer({
-    id: 'bv-fill',
+    id: FILL_LAYER,
     type: 'fill',
-    source: 'bureaux-vote',
+    source: SOURCE_NAME,
     paint: {
       'fill-color': buildColorExpr('abstention'),
       'fill-opacity': [
@@ -101,9 +120,9 @@ export function addDataLayers(data) {
   });
 
   map.addLayer({
-    id: 'bv-outline',
+    id: LINE_LAYER,
     type: 'line',
-    source: 'bureaux-vote',
+    source: SOURCE_NAME,
     paint: {
       'line-color': [
         'case',
@@ -123,14 +142,15 @@ export function addDataLayers(data) {
 }
 
 export function switchMapLayer(layer) {
-  if (map.getLayer('bv-fill')) {
-    map.setPaintProperty('bv-fill', 'fill-color', buildColorExpr(layer));
+  if (map.getLayer(FILL_LAYER)) {
+    map.setPaintProperty(FILL_LAYER, 'fill-color', buildColorExpr(layer));
   }
 }
 
 export function updateLegend(layer) {
-  const meta   = LAYER_META[layer];
-  const party  = PARTY_META[layer];
+  const vcfg  = viewConfig;
+  const meta  = vcfg.layerMeta[layer];
+  const party = vcfg.partyMeta[layer];
 
   document.getElementById('legend-title').textContent = meta.label;
 
@@ -154,15 +174,14 @@ export function updateLegend(layer) {
   if (meta.categorical) {
     const bar = document.getElementById('legend-bar');
     bar.innerHTML = '';
-    const labels = document.getElementById('legend-labels');
 
     if (layer.startsWith('lisa_')) {
       const cats = [
-        { key: 'HH', label: 'HH', color: LISA_COLORS.HH },
-        { key: 'HL', label: 'HL', color: LISA_COLORS.HL },
-        { key: 'LH', label: 'LH', color: LISA_COLORS.LH },
-        { key: 'LL', label: 'LL', color: LISA_COLORS.LL },
-        { key: 'NS', label: 'NS', color: LISA_COLORS.NS },
+        { key: 'HH', color: LISA_COLORS.HH },
+        { key: 'HL', color: LISA_COLORS.HL },
+        { key: 'LH', color: LISA_COLORS.LH },
+        { key: 'LL', color: LISA_COLORS.LL },
+        { key: 'NS', color: LISA_COLORS.NS },
       ];
       cats.forEach(c => {
         const d = document.createElement('div');
@@ -185,16 +204,18 @@ export function updateLegend(layer) {
     return;
   }
 
-  const colors = COLORS[layer];
+  const colors = vcfg.colors[layer];
   const b      = BREAKS[layer];
 
   const bar = document.getElementById('legend-bar');
   bar.innerHTML = '';
-  colors.forEach(c => {
-    const d = document.createElement('div');
-    d.style.background = c;
-    bar.appendChild(d);
-  });
+  if (colors) {
+    colors.forEach(c => {
+      const d = document.createElement('div');
+      d.style.background = c;
+      bar.appendChild(d);
+    });
+  }
 
   if (!b) return;
 
@@ -207,65 +228,110 @@ export function updateLegend(layer) {
   document.getElementById('leg-max').textContent = '> ' + fmt(b.Q4) + meta.unit;
 }
 
+// ═══════════════════════════════════════════════════════════
+// Tooltip
+// ═══════════════════════════════════════════════════════════
+
+function buildParisTooltip(props) {
+  const vcfg = viewConfig;
+  const fmt = (v, d=1) => (v == null || v === 'null') ? '–'
+    : (d === 0 ? Math.round(+v).toLocaleString('fr-FR') : (+v).toFixed(d));
+
+  const candidateRows = [
+    { key: 'gregoire',  field: 'pct_gregoire',  name: 'Grégoire' },
+    { key: 'dati',      field: 'pct_dati',      name: 'Dati' },
+    { key: 'chikirou',  field: 'pct_chikirou',  name: 'Chikirou' },
+    { key: 'bournazel', field: 'pct_bournazel', name: 'Bournazel' },
+    { key: 'knafo',     field: 'pct_knafo',     name: 'Knafo' }
+  ].filter(c => props[c.field] != null && props[c.field] !== 'null');
+
+  const candidatesHtml = candidateRows.length ? `
+    <div class="tip-candidates">
+      ${candidateRows.map(c => `
+        <div class="tip-cand">
+          <span class="tip-cand-dot" style="background:${vcfg.partyMeta[c.key].color}"></span>
+          <span class="tip-cand-name">${c.name}</span>
+          <span class="tip-cand-pct">${fmt(props[c.field])}%</span>
+        </div>
+      `).join('')}
+    </div>` : '';
+
+  return `
+    <div class="tip-title">BV ${props.code_bv}${props.arrondissement ? ' · ' + props.arrondissement : ''}</div>
+    <div class="tip-row"><span class="tip-label">Inscrits</span><span class="tip-val">${fmt(props.inscrits, 0)}</span></div>
+    <div class="tip-row"><span class="tip-label">Abstention</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
+    <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
+    <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
+    ${candidatesHtml}
+    ${props.cluster_id != null ? `
+    <div class="tip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
+      <span class="tip-label">Cluster</span>
+      <span class="tip-val">${props.cluster_id}</span>
+    </div>` : ''}
+    ${props.lisa_taux_abstention && props.lisa_taux_abstention !== 'NS' ? `
+    <div class="tip-row">
+      <span class="tip-label">LISA abst.</span>
+      <span class="tip-val" style="color:${LISA_COLORS[props.lisa_taux_abstention] || '#888'}">${props.lisa_taux_abstention}</span>
+    </div>` : ''}
+    <div class="tip-warn">
+      ⚠ L'abstention est calculée sur les inscrits uniquement.
+      Dans les quartiers HLM, le taux réel de non-participation
+      est probablement sous-estimé (Braconnier &amp; Dormagen, 2007).
+    </div>
+  `;
+}
+
+function buildIdfTooltip(props) {
+  const vcfg = viewConfig;
+  const fmt = (v, d=1) => (v == null || v === 'null') ? '–'
+    : (d === 0 ? Math.round(+v).toLocaleString('fr-FR') : (+v).toFixed(d));
+
+  const familyRows = [
+    { key: 'gauche',     field: 'pct_gauche',      name: 'Gauche' },
+    { key: 'centre',     field: 'pct_centre',      name: 'Centre' },
+    { key: 'droite',     field: 'pct_droite',      name: 'Droite' },
+    { key: 'ext_droite', field: 'pct_ext_droite',  name: 'Extr. droite' },
+    { key: 'autres',     field: 'pct_autres',      name: 'Autres' },
+  ].filter(c => props[c.field] != null && +props[c.field] > 0);
+
+  const familiesHtml = familyRows.length ? `
+    <div class="tip-candidates">
+      ${familyRows.map(c => `
+        <div class="tip-cand">
+          <span class="tip-cand-dot" style="background:${vcfg.partyMeta[c.key]?.color || '#888'}"></span>
+          <span class="tip-cand-name">${c.name}</span>
+          <span class="tip-cand-pct">${fmt(props[c.field])}%</span>
+        </div>
+      `).join('')}
+    </div>` : '';
+
+  return `
+    <div class="tip-title">${props.nom_commune || props.code_commune}${props.departement ? ' · Dép. ' + props.departement : ''}</div>
+    <div class="tip-row"><span class="tip-label">Inscrits</span><span class="tip-val">${fmt(props.inscrits, 0)}</span></div>
+    <div class="tip-row"><span class="tip-label">Abstention</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
+    <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
+    <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
+    ${familiesHtml}
+  `;
+}
+
 function setupTooltip() {
   const tooltip = document.getElementById('tooltip');
 
-  map.on('mousemove', 'bv-fill', e => {
+  _onMouseMove = e => {
     map.getCanvas().style.cursor = 'crosshair';
     const props = e.features[0].properties;
     const id    = e.features[0].id;
 
-    if (hoveredBvId !== null && hoveredBvId !== id) {
-      map.setFeatureState({ source: 'bureaux-vote', id: hoveredBvId }, { hover: false });
+    if (hoveredId !== null && hoveredId !== id) {
+      map.setFeatureState({ source: SOURCE_NAME, id: hoveredId }, { hover: false });
     }
-    hoveredBvId = id;
-    map.setFeatureState({ source: 'bureaux-vote', id: id }, { hover: true });
+    hoveredId = id;
+    map.setFeatureState({ source: SOURCE_NAME, id: id }, { hover: true });
 
-    const fmt = (v, d=1) => (v == null || v === 'null') ? '–'
-      : (d === 0 ? Math.round(+v).toLocaleString('fr-FR') : (+v).toFixed(d));
-
-    const candidateRows = [
-      { key: 'gregoire',  field: 'pct_gregoire',  name: 'Grégoire' },
-      { key: 'dati',      field: 'pct_dati',      name: 'Dati' },
-      { key: 'chikirou',  field: 'pct_chikirou',  name: 'Chikirou' },
-      { key: 'bournazel', field: 'pct_bournazel', name: 'Bournazel' },
-      { key: 'knafo',     field: 'pct_knafo',     name: 'Knafo' }
-    ].filter(c => props[c.field] != null && props[c.field] !== 'null');
-
-    const candidatesHtml = candidateRows.length ? `
-      <div class="tip-candidates">
-        ${candidateRows.map(c => `
-          <div class="tip-cand">
-            <span class="tip-cand-dot" style="background:${PARTY_META[c.key].color}"></span>
-            <span class="tip-cand-name">${c.name}</span>
-            <span class="tip-cand-pct">${fmt(props[c.field])}%</span>
-          </div>
-        `).join('')}
-      </div>` : '';
-
-    tooltip.innerHTML = `
-      <div class="tip-title">BV ${props.code_bv}${props.arrondissement ? ' · ' + props.arrondissement : ''}</div>
-      <div class="tip-row"><span class="tip-label">Inscrits</span><span class="tip-val">${fmt(props.inscrits, 0)}</span></div>
-      <div class="tip-row"><span class="tip-label">Abstention</span><span class="tip-val">${fmt(props.taux_abstention)} %</span></div>
-      <div class="tip-row"><span class="tip-label">Revenu médian</span><span class="tip-val">${fmt(props.revenu_median, 0)} €/UC</span></div>
-      <div class="tip-row"><span class="tip-label">HLM</span><span class="tip-val">${fmt(props.n_hlm, 0)} (${fmt(props.hlm_density, 0)}/km²)</span></div>
-      ${candidatesHtml}
-      ${props.cluster_id != null ? `
-      <div class="tip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
-        <span class="tip-label">Cluster</span>
-        <span class="tip-val">${props.cluster_id}</span>
-      </div>` : ''}
-      ${props.lisa_taux_abstention && props.lisa_taux_abstention !== 'NS' ? `
-      <div class="tip-row">
-        <span class="tip-label">LISA abst.</span>
-        <span class="tip-val" style="color:${LISA_COLORS[props.lisa_taux_abstention] || '#888'}">${props.lisa_taux_abstention}</span>
-      </div>` : ''}
-      <div class="tip-warn">
-        ⚠ L'abstention est calculée sur les inscrits uniquement.
-        Dans les quartiers HLM, le taux réel de non-participation
-        est probablement sous-estimé (Braconnier &amp; Dormagen, 2007).
-      </div>
-    `;
+    tooltip.innerHTML = currentView === 'paris'
+      ? buildParisTooltip(props)
+      : buildIdfTooltip(props);
 
     const rect = map.getCanvas().getBoundingClientRect();
     let tx = e.originalEvent.clientX - rect.left + 14;
@@ -276,18 +342,22 @@ function setupTooltip() {
     tooltip.style.top     = ty + 'px';
     tooltip.style.display = 'block';
 
-    if (onHoverBv) onHoverBv(props.code_bv);
-  });
+    const vcfg = viewConfig;
+    if (onHoverFeature) onHoverFeature(props[vcfg.idField]);
+  };
 
-  map.on('mouseleave', 'bv-fill', () => {
+  _onMouseLeave = () => {
     map.getCanvas().style.cursor = '';
     tooltip.style.display = 'none';
-    if (hoveredBvId !== null) {
-      map.setFeatureState({ source: 'bureaux-vote', id: hoveredBvId }, { hover: false });
-      hoveredBvId = null;
+    if (hoveredId !== null) {
+      map.setFeatureState({ source: SOURCE_NAME, id: hoveredId }, { hover: false });
+      hoveredId = null;
     }
-    if (onLeaveBv) onLeaveBv();
-  });
+    if (onLeaveFeature) onLeaveFeature();
+  };
+
+  map.on('mousemove',  FILL_LAYER, _onMouseMove);
+  map.on('mouseleave', FILL_LAYER, _onMouseLeave);
 }
 
 export function flyToFeature(feature) {

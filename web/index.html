@@ -10,6 +10,10 @@
 <header id="header">
   <div id="header-logo">🗳</div>
   <h1>SocioÉlect Paris</h1>
+  <div id="view-toggle">
+    <button data-view="paris" class="active">Paris BV</button>
+    <button data-view="idf">Grand Paris</button>
+  </div>
   <span class="sep">|</span>
   <span class="subtitle">Municipales 2026 · Premier tour · ~900 bureaux de vote</span>
   <div id="header-spacer"></div>
@@ -25,28 +29,7 @@
     <div id="layer-controls">
       <button id="mobile-layer-toggle" type="button">Afficher les couches</button>
       <div class="ctrl-label">Afficher</div>
-      <div class="ctrl-group">
-        <div class="group-title">Socio-éco</div>
-        <button class="layer-btn active" data-layer="abstention">Taux d'abstention</button>
-        <button class="layer-btn" data-layer="revenu">Revenu médian</button>
-        <button class="layer-btn" data-layer="hlm">Densité HLM</button>
-      </div>
-      <div class="ctrl-group">
-        <div class="group-title">Candidats</div>
-        <button class="layer-btn" data-layer="gregoire" style="--party-color:#E91E8C"><span class="party-badge" style="background:#E91E8C">LUG</span>Grégoire</button>
-        <button class="layer-btn" data-layer="dati"     style="--party-color:#1A5CB8"><span class="party-badge" style="background:#1A5CB8">LUD</span>Dati</button>
-        <button class="layer-btn" data-layer="chikirou" style="--party-color:#CC0000"><span class="party-badge" style="background:#CC0000">LFI</span>Chikirou</button>
-        <button class="layer-btn" data-layer="bournazel" style="--party-color:#E07B00"><span class="party-badge" style="background:#E07B00">LUC</span>Bournazel</button>
-        <button class="layer-btn" data-layer="knafo"    style="--party-color:#1E5F8A"><span class="party-badge" style="background:#1E5F8A">LEXD</span>Knafo</button>
-        <button class="layer-btn" data-layer="autres"   style="--party-color:#555e6d"><span class="party-badge" style="background:#555e6d">–</span>Autres</button>
-      </div>
-      <div class="ctrl-group">
-        <div class="group-title">Analyse spatiale</div>
-        <button class="layer-btn" data-layer="lisa_abstention">LISA · Abstention</button>
-        <button class="layer-btn" data-layer="lisa_revenu">LISA · Revenu</button>
-        <button class="layer-btn" data-layer="lisa_hlm">LISA · HLM</button>
-        <button class="layer-btn" data-layer="cluster">Typologie sociale</button>
-      </div>
+      <!-- Layer buttons generated dynamically by main.js -->
     </div>
 
     <div id="legend">
@@ -93,7 +76,7 @@
     <div id="stats-bar">
       <div class="stat-item"><span class="stat-label">r²</span><span class="stat-val" id="stat-r2">–</span></div>
       <div class="stat-item"><span class="stat-label">r Pearson</span><span class="stat-val" id="stat-r">–</span></div>
-      <div class="stat-item"><span class="stat-label">n bureaux</span><span class="stat-val" id="stat-n">–</span></div>
+      <div class="stat-item"><span class="stat-label" id="stat-n-label">n bureaux</span><span class="stat-val" id="stat-n">–</span></div>
     </div>
   </div>
 </div>
