@@ -28,6 +28,8 @@ ELECTIONS_CSV = os.path.join(RAW, "premier_tour_resultat",
     "municipales-2026-resultats-bv-par-communes-2026-03-16.csv")
 ELECTIONS_2020_TXT = os.path.join(RAW, "premier_tour_resultat",
     "municipales-2020-resultats-bv-t1-france.txt")
+RP2021_PARQUET  = os.path.join(RAW, "RP2021_indcvi.parquet")
+RP2021_IRIS_CSV = os.path.join(RAW, "paris_rp2021_iris_eligible.csv")
 BV_GEOJSON    = os.path.join(RAW, "bureaux_vote",
     "secteurs-des-bureaux-de-vote-2026.geojson")
 FILO_CSV      = os.path.join(RAW, "BASE_TD_FILO_IRIS_2021_DISP_CSV",
@@ -260,6 +262,57 @@ def load_elections_2020():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 4d. Non-inscrits — population éligible (Français 18+) par IRIS, RP 2021
+# ══════════════════════════════════════════════════════════════════════════════
+
+def load_rp2021_iris():
+    """
+    Retourne un DataFrame {CODE_IRIS, pop_eligible_18_fr} depuis :
+      1. le CSV pré-calculé (si disponible, évite de relire le Parquet)
+      2. le fichier Parquet RP2021 individus si nécessaire
+    """
+    if os.path.exists(RP2021_IRIS_CSV):
+        print("[4d] RP2021 IRIS eligible (CSV cache)…")
+        df = pd.read_csv(RP2021_IRIS_CSV)
+        df["CODE_IRIS"] = df["CODE_IRIS"].astype(str).str.strip()
+        print(f"  {len(df)} IRIS  |  pop_eligible_18_fr total = "
+              f"{df['pop_eligible_18_fr'].sum():,.0f}")
+        return df[["CODE_IRIS", "pop_eligible_18_fr"]]
+
+    if not os.path.exists(RP2021_PARQUET):
+        print("[4d] Fichier RP2021 introuvable — skip non-inscrits")
+        return None
+
+    print("[4d] RP2021 individus (Parquet) — extraction Paris…")
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        print("  pyarrow non installé — pip install pyarrow")
+        return None
+
+    paris_df = pq.read_table(
+        RP2021_PARQUET,
+        columns=["IRIS", "AGED", "INATC", "IPONDI"],
+        filters=[("DEPT", "=", "75")],
+    ).to_pandas()
+
+    paris_df["age_num"] = pd.to_numeric(paris_df["AGED"], errors="coerce")
+    paris_df["weight"]  = pd.to_numeric(paris_df["IPONDI"], errors="coerce").fillna(0)
+
+    pop_total    = paris_df.groupby("IRIS")["weight"].sum().rename("pop_total")
+    eligible     = paris_df[(paris_df["INATC"] == "1") & (paris_df["age_num"] >= 18)]
+    pop_eligible = eligible.groupby("IRIS")["weight"].sum().rename("pop_eligible_18_fr")
+
+    result = pd.concat([pop_total, pop_eligible], axis=1).reset_index()
+    result.columns = ["CODE_IRIS", "pop_total", "pop_eligible_18_fr"]
+    result.to_csv(RP2021_IRIS_CSV, index=False)
+
+    print(f"  {len(result)} IRIS  |  pop_eligible_18_fr total = "
+          f"{result['pop_eligible_18_fr'].sum():,.0f}")
+    return result[["CODE_IRIS", "pop_eligible_18_fr"]]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 6. Jointure centroïde : BV → IRIS
 # ══════════════════════════════════════════════════════════════════════════════
 def centroid_join(gdf_bv_2154, gdf_iris_2154):
@@ -310,6 +363,7 @@ def main():
     # Chargement
     df_elec    = load_elections()
     df_elec_20 = load_elections_2020()
+    df_rp21    = load_rp2021_iris()
     gdf_bv     = load_bv()           # EPSG:4326
     gdf_iris   = load_iris()         # EPSG:2154
     df_rev     = load_revenus()
@@ -339,6 +393,51 @@ def main():
     gdf = gdf.merge(df_rev, on="CODE_IRIS", how="left")
     gdf = gdf.merge(df_hlm, on="CODE_IRIS", how="left")
 
+    # Fusion RP2021 : population éligible par IRIS, puis taux de non-inscription
+    if df_rp21 is not None:
+        gdf = gdf.merge(df_rp21, on="CODE_IRIS", how="left")
+        # inscrits par BV → agréger par IRIS pour comparer à pop_eligible
+        iris_inscrits = (
+            gdf.groupby("CODE_IRIS")["inscrits"]
+            .sum()
+            .reset_index()
+            .rename(columns={"inscrits": "inscrits_iris"})
+        )
+        gdf = gdf.merge(iris_inscrits, on="CODE_IRIS", how="left")
+        # Taux de non-inscription estimé.
+        # NaN si inscrits_iris >= pop_eligible (dénominateur sous-estimé par
+        # mobilité résidentielle 2021-2026 ou sous-comptage du RP).
+        raw_nonins = (
+            (gdf["pop_eligible_18_fr"] - gdf["inscrits_iris"])
+            / gdf["pop_eligible_18_fr"] * 100
+        ).round(1)
+        gdf["taux_non_inscription"] = raw_nonins.where(raw_nonins > 0, other=float("nan"))
+
+        # Taux de non-participation réelle = abstentions + non-inscrits.
+        # Non-inscrits par BV ≈ non_inscrits_iris × (inscrits_bv / inscrits_iris)
+        non_inscrits_iris = (gdf["pop_eligible_18_fr"] - gdf["inscrits_iris"]).clip(lower=0)
+        non_inscrits_bv   = non_inscrits_iris * gdf["inscrits"] / gdf["inscrits_iris"]
+        gdf["taux_non_participation_reel"] = (
+            (gdf["abstentions"] + non_inscrits_bv)
+            / gdf["pop_eligible_18_fr"] * 100
+        ).clip(lower=0, upper=100).round(1)
+        # NaN when non_inscrits are zero (denominator underestimated)
+        gdf["taux_non_participation_reel"] = gdf["taux_non_participation_reel"].where(
+            raw_nonins > 0, other=float("nan")
+        )
+
+        n_nonins = gdf["taux_non_inscription"].notna().sum()
+        n_nonpart = gdf["taux_non_participation_reel"].notna().sum()
+        print(f"\n[4d] Couverture : {n_nonins}/{len(gdf)} BV avec taux_non_inscription détectable")
+        print(f"  taux_non_inscription — "
+              f"min={gdf['taux_non_inscription'].min():.1f}  "
+              f"med={gdf['taux_non_inscription'].dropna().median():.1f}  "
+              f"max={gdf['taux_non_inscription'].max():.1f} %")
+        print(f"  taux_non_participation_reel — "
+              f"min={gdf['taux_non_participation_reel'].min():.1f}  "
+              f"med={gdf['taux_non_participation_reel'].dropna().median():.1f}  "
+              f"max={gdf['taux_non_participation_reel'].max():.1f} %")
+
     # Fusion données 2020 et calcul delta abstention
     if df_elec_20 is not None:
         gdf = gdf.merge(df_elec_20, on="join_key", how="left")
@@ -356,11 +455,13 @@ def main():
     # Champs finaux pour le frontend
     pct_cols = list(CANDIDATES.keys()) + ["pct_autres"]
     hist_cols = ["taux_abstention_2020", "delta_abstention"] if df_elec_20 is not None else []
+    nonins_cols = (["taux_non_inscription", "taux_non_participation_reel"]
+                   if df_rp21 is not None else [])
     keep = [
         "geometry", "join_key", "arrondissement_label",
         "inscrits", "abstentions", "taux_abstention",
         "revenu_median", "n_hlm", "hlm_density",
-    ] + pct_cols + hist_cols
+    ] + pct_cols + hist_cols + nonins_cols
 
     keep = [c for c in keep if c in gdf.columns]
     gdf_out = gdf[keep].rename(columns={
@@ -397,7 +498,7 @@ def main():
         print(f"  {label}: Q1={q[0]}  Q2={q[1]}  Q3={q[2]}  Q4={q[3]}")
 
     print("\n── Couverture des champs ───────────────────────────────────────────")
-    for col in ["taux_abstention", "revenu_median", "hlm_density"] + pct_cols + hist_cols:
+    for col in ["taux_abstention", "revenu_median", "hlm_density"] + pct_cols + hist_cols + nonins_cols:
         if col not in gdf_out.columns:
             continue
         s = gdf_out[col]

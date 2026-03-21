@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 // COLOR SCALES — static per layer
 // ═══════════════════════════════════════════════════════════
 export const COLORS = {
-  abstention:          ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
+  abstention:            ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
   revenu:              ['#edf8fb','#b3cde3','#8c96c6','#8856a7','#810f7c'],
   hlm:                 ['#ffffcc','#c2e699','#78c679','#31a354','#006837'],
   gregoire:            ['#fce4f3','#f4a8d4','#ec6db5','#d41880','#9d005d'],
@@ -17,6 +17,9 @@ export const COLORS = {
   abstention_2020:     ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'],
   // Delta: blue (big drop) → grey → red (small drop / increase)
   delta_abstention:    ['#2166ac','#92c5de','#f7f7f7','#f4a582','#d6604d'],
+  // Non-registration / real non-participation: light yellow → dark orange/red
+  non_inscription:     ['#fff7bc','#fee391','#fec44f','#fe9929','#cc4c02'],
+  non_participation:   ['#fff7bc','#fee391','#fec44f','#fe9929','#cc4c02'],
 };
 
 export const IDF_COLORS = {
@@ -65,6 +68,9 @@ export const LAYER_META = {
   // Historical comparison 2020 vs 2026
   abstention_2020:  { field: 'taux_abstention_2020', label: 'Abstention 2020 (%)',  shortLabel: 'Abstention 2020', unit: '%', decimals: 1 },
   delta_abstention: { field: 'delta_abstention',     label: 'Évolution abstention (2020→2026, pts)', shortLabel: 'Δ Abstention', unit: ' pts', decimals: 1 },
+  // Non-registration (Phase 4d)
+  non_inscription:     { field: 'taux_non_inscription',        label: 'Non-inscrits estimés (%)',         shortLabel: 'Non-inscrits',      unit: '%', decimals: 1 },
+  non_participation:   { field: 'taux_non_participation_reel', label: 'Non-participation réelle (%)',     shortLabel: 'Non-participation',  unit: '%', decimals: 1 },
 };
 
 export const IDF_LAYER_META = {
@@ -116,13 +122,15 @@ export const VIEW_CONFIG = {
       { title: 'Candidats',        keys: ['gregoire','dati','chikirou','bournazel','knafo','autres'] },
       { title: 'Analyse spatiale', keys: ['lisa_abstention','lisa_revenu','lisa_hlm','cluster'] },
       { title: 'Historique',       keys: ['abstention_2020','delta_abstention'] },
+      { title: 'Non-participation', keys: ['non_inscription','non_participation'] },
     ],
     csvFields: [
       'code_bv', 'arrondissement', 'inscrits',
       'taux_abstention', 'revenu_median', 'hlm_density', 'n_hlm',
       'pct_gregoire', 'pct_dati', 'pct_chikirou', 'pct_bournazel', 'pct_knafo', 'pct_autres',
       'lisa_taux_abstention', 'lisa_revenu_median', 'lisa_hlm_density', 'cluster_id',
-      'taux_abstention_2020', 'delta_abstention'
+      'taux_abstention_2020', 'delta_abstention',
+      'taux_non_inscription', 'taux_non_participation_reel'
     ],
     csvFilename: 'socioelect_paris_donnees.csv',
   },
