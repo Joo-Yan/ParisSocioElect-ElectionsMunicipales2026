@@ -187,6 +187,10 @@ async function switchView(view, { skipHashWrite = false, center, zoom } = {}) {
     // Rebuild layer buttons
     buildLayerButtons(vcfg);
 
+    // Story mode is Paris-only (steps reference Paris-only layers)
+    const storyBtn = document.getElementById('story-btn');
+    if (storyBtn) storyBtn.style.display = view === 'paris' ? '' : 'none';
+
     const data = geojsonCache[view];
     setBREAKS(breaksCache[view]);
     geojsonData = data;
