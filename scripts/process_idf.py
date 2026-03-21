@@ -285,12 +285,14 @@ def main():
 
     # Join: ← RPLS
     gdf = gdf.merge(df_rpls, on="code_commune", how="left")
+    # Communes absent from RPLS have zero social housing (not missing data)
+    gdf["n_hlm"] = gdf["n_hlm"].fillna(0)
 
     # Compute HLM density (per km²) using geometry area
     gdf_proj = gdf.to_crs("EPSG:2154")
     gdf["area_km2"] = (gdf_proj.geometry.area / 1e6).round(3)
     gdf["hlm_density"] = (gdf["n_hlm"] / gdf["area_km2"]).round(1)
-    gdf.loc[gdf["n_hlm"].isna(), "hlm_density"] = np.nan
+    gdf.loc[gdf["area_km2"] == 0, "hlm_density"] = np.nan
 
     # Join: ← Filosofi revenus
     gdf = gdf.merge(df_rev, on="code_commune", how="left")
