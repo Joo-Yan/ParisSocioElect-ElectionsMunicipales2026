@@ -28,7 +28,7 @@ export function updateScatterHeader() {
 export function populateAxisSelectors(onChangeCallback) {
   const xSelect = document.getElementById('x-axis-select');
   const ySelect = document.getElementById('y-axis-select');
-  const layers = Object.keys(LAYER_META);
+  const layers = Object.keys(LAYER_META).filter(k => !LAYER_META[k].categorical);
 
   [xSelect, ySelect].forEach(select => {
     select.innerHTML = '';

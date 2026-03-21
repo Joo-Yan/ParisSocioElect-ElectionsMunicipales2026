@@ -59,7 +59,8 @@ function applyHashState() {
   if (params.layer && LAYER_META[params.layer]) {
     switchLayer(params.layer);
   }
-  if (params.x && LAYER_META[params.x] && params.y && LAYER_META[params.y]) {
+  if (params.x && LAYER_META[params.x] && !LAYER_META[params.x].categorical &&
+      params.y && LAYER_META[params.y] && !LAYER_META[params.y].categorical) {
     setScatterAxes(params.x, params.y);
     document.getElementById('x-axis-select').value = params.x;
     document.getElementById('y-axis-select').value = params.y;

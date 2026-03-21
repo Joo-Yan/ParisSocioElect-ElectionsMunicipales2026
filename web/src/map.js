@@ -185,6 +185,9 @@ export function updateLegend(layer) {
     return;
   }
 
+  const colors = COLORS[layer];
+  const b      = BREAKS[layer];
+
   const bar = document.getElementById('legend-bar');
   bar.innerHTML = '';
   colors.forEach(c => {

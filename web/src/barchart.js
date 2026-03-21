@@ -53,8 +53,7 @@ export function updateBarChart(features, layer) {
 
   container.innerHTML = '';
   const svg = d3.select(container).append('svg')
-    .attr('width', W).attr('height', Math.min(H, 150))
-    .style('overflow-y', 'auto');
+    .attr('width', W).attr('height', H);
 
   const xScale = d3.scaleLinear()
     .domain([0, d3.max(data, d => d.val) * 1.05])
@@ -100,7 +99,8 @@ export function updateBarChart(features, layer) {
 
   // Click → fly to arrondissement
   rows.on('click', (_, d) => {
-    const center = ARR_CENTERS[d.arr];
+    const key = d.arr.replace(/ arr\.$/, '');
+    const center = ARR_CENTERS[key];
     if (center) {
       const map = getMap();
       if (map) map.flyTo({ center, zoom: 13.5, duration: 600 });
