@@ -25,9 +25,9 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 
 - **大巴黎（法兰西岛）视图** — 可在巴黎投票站视图与覆盖法兰西岛 1200+ 市镇的市镇级视图之间切换。
 - **滚动叙事** — 8 步导览故事，自动驱动地图图层切换和镜头移动（仅限巴黎视图）。
-- **2020 / 2026 对比** — 每个投票站展示与 2020 年市政选举第一轮相比的弃权率变化（第 4c 阶段）。
-- **未登记选民估算** — 基于 INSEE RP 2021 数据，将官方弃权人数与估算的未登记居民合并，计算真实未参与率（第 4d 阶段）。
-- **空间回归** — 通过 `scripts/analysis.py` 执行 OLS → LM 诊断检验 → SLM / SEM 空间回归（第 4e 阶段），并辅以 Moran's I 全局自相关、LISA 聚类和 K-means 社会类型分类（第 4a/4b 阶段）。
+- **2020 / 2026 对比** — 每个投票站展示与 2020 年市政选举第一轮相比的弃权率变化。
+- **未登记选民估算** — 基于 INSEE RP 2021 数据，将官方弃权人数与估算的未登记居民合并，计算真实未参与率。
+- **空间回归** — 通过 `scripts/analysis.py` 执行 OLS → LM 诊断检验 → SLM / SEM 空间回归，并辅以 Moran's I 全局自相关、LISA 聚类和 K-means 社会类型分类。
 
 ## 研究问题
 
@@ -69,11 +69,11 @@ https://joo-yan.github.io/ParisSocioElect-ElectionsMunicipales2026/
 
 **使用 HLM 密度，而非占比。** RPLS 数据集提供每个 IRIS 的社会住房套数，但不提供该 IRIS 的住房总量，因此无法在不引入额外数据源的情况下计算占比（HLM / 总住房）。本项目使用的是**HLM 密度（套/km²）**，用于衡量集中程度，而不是比例。
 
-**2020 / 2026 对比（第 4c 阶段）。** 由于 2020 年至 2026 年间巴黎中心区（第 1-4 区）的投票站重新编号，流程对各区块分别应用偏移量以对齐编号后再进行合并。
+**2020 / 2026 对比。** 由于 2020 年至 2026 年间巴黎中心区（第 1-4 区）的投票站重新编号，流程对各区块分别应用偏移量以对齐编号后再进行合并。
 
-**未登记选民估算（第 4d 阶段）。** INSEE RP 2021 数据可按 IRIS 单元估算符合投票条件的人口（法国公民 18 岁以上）。该人口与注册选民人数之差给出未登记人数的下界，并按比例分配至投票站级别。字段 `taux_non_inscription` 将官方弃权人数与估算未登记人数合并，生成真实未参与率——比官方指标更能反映真实的政治脱离程度。
+**未登记选民估算。** INSEE RP 2021 数据可按 IRIS 单元估算符合投票条件的人口（法国公民 18 岁以上）。该人口与注册选民人数之差给出未登记人数的下界，并按比例分配至投票站级别。字段 `taux_non_inscription` 将官方弃权人数与估算未登记人数合并，生成真实未参与率——比官方指标更能反映真实的政治脱离程度。
 
-**空间回归（第 4e 阶段）。** `scripts/analysis.py` 依次执行 OLS → LM 诊断检验 → SLM（空间滞后模型）或 SEM（空间误差模型）。同时计算全局 Moran's I 和 LISA 聚类指标（第 4a 阶段）以及 K-means 社会类型分类（第 4b 阶段）。这些分析在 `process.py` 生成的 GeoJSON 基础上进行后处理。
+**空间回归。** `scripts/analysis.py` 依次执行 OLS → LM 诊断检验 → SLM（空间滞后模型）或 SEM（空间误差模型）。同时计算全局 Moran's I 和 LISA 聚类指标以及 K-means 社会类型分类。这些分析在 `process.py` 生成的 GeoJSON 基础上进行后处理。
 
 ## 关键结果（2026 年第一轮）
 
@@ -117,8 +117,8 @@ npm install
 | `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | 是 |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS（IRIS 级） | 是 |
 | `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — 脚本自动检测第一个 `CONTOURS-IRIS*` 目录中的 `.gpkg` 文件 | 是 |
-| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - 法国内政部 | 否（第 4c 阶段） |
-| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 个人数据 | 否（第 4d 阶段） |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - 法国内政部 | 否 |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 个人数据 | 否 |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS（市镇级） | 否（法兰西岛视图） |
 | `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG（市镇边界） | 否（法兰西岛视图） |
 

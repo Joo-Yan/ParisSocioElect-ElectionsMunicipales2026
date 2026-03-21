@@ -25,9 +25,9 @@ The project also includes:
 
 - **Grand Paris (Île-de-France) view** — toggle between the Paris precinct-level view and a commune-level view covering 1,200+ municipalities in the Île-de-France region.
 - **Scrollytelling narrative** — a guided 8-step story that automatically drives layer selection and map camera (Paris view only).
-- **2020 / 2026 comparison** — each precinct shows the change in abstention rate relative to the first round of the 2020 municipal elections (Phase 4c).
-- **Non-registered voter estimation** — real non-participation rate combining official abstentions with estimated non-registrants derived from INSEE RP 2021 (Phase 4d).
-- **Spatial regression** — OLS → LM diagnostic tests → SLM / SEM via `scripts/analysis.py` (Phase 4e), complemented by global Moran's I, LISA clustering, and K-means social typology (Phases 4a/4b).
+- **2020 / 2026 comparison** — each precinct shows the change in abstention rate relative to the first round of the 2020 municipal elections.
+- **Non-registered voter estimation** — real non-participation rate combining official abstentions with estimated non-registrants derived from INSEE RP 2021.
+- **Spatial regression** — OLS → LM diagnostic tests → SLM / SEM via `scripts/analysis.py`, complemented by global Moran's I, LISA clustering, and K-means social typology.
 
 ## Research questions
 
@@ -69,11 +69,11 @@ Note: 59 of 903 precincts have no `revenu_median` value because INSEE applies st
 
 **HLM density, not share.** The RPLS dataset provides the number of social housing units per IRIS, but not the total number of dwellings in the IRIS. It is therefore not possible to compute a share (HLM / total dwellings) without an additional source. The chosen indicator is **HLM density (units/km²)**, which measures concentration rather than share.
 
-**2020 / 2026 comparison (Phase 4c).** Precinct numbering in Paris Centre (arrondissements 1-4) changed between 2020 and 2026 due to the inter-arrondissement merger. The pipeline applies per-block offsets to re-align codes before the join.
+**2020 / 2026 comparison.** Precinct numbering in Paris Centre (arrondissements 1-4) changed between 2020 and 2026 due to the inter-arrondissement merger. The pipeline applies per-block offsets to re-align codes before the join.
 
-**Non-registered voter estimation (Phase 4d).** INSEE RP 2021 provides an estimate of the eligible voting population (French citizens aged 18+) by IRIS unit. The gap between this population and the registered voter count gives a lower bound on non-registrants, prorated to precinct level. The field `taux_non_inscription` combines official abstentions with estimated non-registrants to produce a real non-participation rate — a more accurate measure of political disengagement than the official figure.
+**Non-registered voter estimation.** INSEE RP 2021 provides an estimate of the eligible voting population (French citizens aged 18+) by IRIS unit. The gap between this population and the registered voter count gives a lower bound on non-registrants, prorated to precinct level. The field `taux_non_inscription` combines official abstentions with estimated non-registrants to produce a real non-participation rate — a more accurate measure of political disengagement than the official figure.
 
-**Spatial regression (Phase 4e).** `scripts/analysis.py` runs OLS → LM diagnostic tests → SLM (spatial lag) or SEM (spatial error) depending on which test is significant. It also computes global Moran's I and LISA cluster indicators (Phase 4a) and a K-means social typology (Phase 4b). These analyses run as post-processing on the GeoJSON produced by `process.py`.
+**Spatial regression.** `scripts/analysis.py` runs OLS → LM diagnostic tests → SLM (spatial lag) or SEM (spatial error) depending on which test is significant. It also computes global Moran's I and LISA cluster indicators and a K-means social typology. These analyses run as post-processing on the GeoJSON produced by `process.py`.
 
 ## Key results (first round, 2026)
 
@@ -117,8 +117,8 @@ Place files in `data/raw/` with the **exact subdirectory names and filenames** e
 | `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | Yes |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS (IRIS) | Yes |
 | `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — script auto-detects the `.gpkg` in the first `CONTOURS-IRIS*` folder | Yes |
-| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | No (Phase 4c) |
-| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individuals file | No (Phase 4d) |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | No |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individuals file | No |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS (commune) | No (IDF view) |
 | `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG (commune boundaries) | No (IDF view) |
 

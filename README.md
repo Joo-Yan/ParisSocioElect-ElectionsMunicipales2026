@@ -25,9 +25,9 @@ Le projet propose également :
 
 - **Vue Grand Paris (Île-de-France)** — bascule entre la vue Paris (bureaux de vote) et une vue communale Île-de-France couvrant les 1 200+ communes de la région.
 - **Récit scrollytelling** — narration guidée en 8 étapes pilotant automatiquement la couche et le cadrage de la carte (vue Paris uniquement).
-- **Comparaison 2020 / 2026** — chaque bureau affiche l'évolution de l'abstention par rapport au premier tour des municipales 2020 (Phase 4c).
-- **Estimation des non-inscrits** — taux de non-participation réelle combinant abstentions et non-inscrits estimés à partir du RP 2021 INSEE (Phase 4d).
-- **Régression spatiale** — diagnostic OLS → tests LM → SLM / SEM via `scripts/analysis.py` (Phase 4e), complété par l'autocorrélation spatiale Moran's I, LISA et classification K-means (Phases 4a/4b).
+- **Comparaison 2020 / 2026** — chaque bureau affiche l'évolution de l'abstention par rapport au premier tour des municipales 2020.
+- **Estimation des non-inscrits** — taux de non-participation réelle combinant abstentions et non-inscrits estimés à partir du RP 2021 INSEE.
+- **Régression spatiale** — diagnostic OLS → tests LM → SLM / SEM via `scripts/analysis.py`, complété par l'autocorrélation spatiale Moran's I, LISA et classification K-means.
 
 ## Questions de recherche
 
@@ -69,11 +69,11 @@ Note : 59 des 903 bureaux n'ont pas de valeur `revenu_median` car l'INSEE appliq
 
 **Densité HLM, pas part.** Le fichier RPLS donne le nombre de logements sociaux par IRIS, mais pas le nombre total de logements dans l'IRIS. Il n'est donc pas possible de calculer une part (HLM / total logements) sans source supplémentaire. L'indicateur retenu est la **densité HLM (unités/km²)**, qui mesure la concentration plutôt que la proportion.
 
-**Comparaison 2020 / 2026 (Phase 4c).** Le numérotation des bureaux du Paris Centre (arr. 1-4) a changé entre 2020 et 2026 en raison du regroupement des arrondissements. Le pipeline applique des décalages par bloc d'arrondissement pour rétablir la concordance avant la fusion.
+**Comparaison 2020 / 2026.** Le numérotation des bureaux du Paris Centre (arr. 1-4) a changé entre 2020 et 2026 en raison du regroupement des arrondissements. Le pipeline applique des décalages par bloc d'arrondissement pour rétablir la concordance avant la fusion.
 
-**Estimation des non-inscrits (Phase 4d).** Le RP 2021 INSEE permet d'estimer la population éligible au vote (Français 18+) par IRIS. La différence entre cette population et le nombre d'inscrits donne une borne basse du nombre de non-inscrits, proratisée au niveau bureau de vote. Le champ `taux_non_inscription` combine abstentions et non-inscrits estimés pour fournir un taux de non-participation réelle — plus représentatif du décrochage politique effectif que le taux officiel.
+**Estimation des non-inscrits.** Le RP 2021 INSEE permet d'estimer la population éligible au vote (Français 18+) par IRIS. La différence entre cette population et le nombre d'inscrits donne une borne basse du nombre de non-inscrits, proratisée au niveau bureau de vote. Le champ `taux_non_inscription` combine abstentions et non-inscrits estimés pour fournir un taux de non-participation réelle — plus représentatif du décrochage politique effectif que le taux officiel.
 
-**Régression spatiale (Phase 4e).** `scripts/analysis.py` effectue un enchaînement OLS → tests diagnostiques LM (Lagrange Multiplier) → modèle SLM (spatial lag) ou SEM (spatial error) selon la significativité des tests. Il produit également l'autocorrélation globale de Moran's I (Phase 4a) et une classification K-means des bureaux (Phase 4b). Ces analyses s'effectuent en post-traitement sur le GeoJSON généré par `process.py`.
+**Régression spatiale.** `scripts/analysis.py` effectue un enchaînement OLS → tests diagnostiques LM (Lagrange Multiplier) → modèle SLM (spatial lag) ou SEM (spatial error) selon la significativité des tests. Il produit également l'autocorrélation globale de Moran's I et une classification K-means des bureaux. Ces analyses s'effectuent en post-traitement sur le GeoJSON généré par `process.py`.
 
 ## Résultats clés (premier tour, 2026)
 
@@ -117,8 +117,8 @@ Placer les fichiers dans `data/raw/` avec les **noms de sous-dossiers et noms de
 | `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | Oui |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS (IRIS) | Oui |
 | `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — le script détecte automatiquement le `.gpkg` dans le premier dossier `CONTOURS-IRIS*` | Oui |
-| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | Non (Phase 4c) |
-| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individus | Non (Phase 4d) |
+| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | Non |
+| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individus | Non |
 | `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS (commune) | Non (vue IDF) |
 | `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG (contours communes) | Non (vue IDF) |
 
