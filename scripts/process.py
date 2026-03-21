@@ -21,7 +21,7 @@ from shapely.geometry import Point
 RAW       = "data/raw"
 PROCESSED = "data/processed"
 OUTPUT    = os.path.join(PROCESSED, "paris_2026_t1.geojson")
-WEB_PROCESSED = os.path.join("web", "data", "processed")
+WEB_PROCESSED = os.path.join("web", "public", "data", "processed")
 WEB_OUTPUT    = os.path.join(WEB_PROCESSED, "paris_2026_t1.geojson")
 
 ELECTIONS_CSV = os.path.join(RAW, "premier_tour_resultat",
