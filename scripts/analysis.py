@@ -33,6 +33,10 @@ def _check_deps():
         import sklearn  # noqa: F401
     except ImportError:
         missing.append("scikit-learn")
+    try:
+        import spreg  # noqa: F401
+    except ImportError:
+        missing.append("spreg")
     if missing:
         print(f"Installing missing dependencies: {', '.join(missing)}")
         import subprocess
@@ -48,6 +52,7 @@ from libpysal.weights import Queen
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+import spreg
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -228,6 +233,121 @@ def run_kmeans(gdf, variables):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Phase 4e — Spatial Regression (OLS → LM tests → SLM / SEM)
+# ══════════════════════════════════════════════════════════════════════════════
+
+REG_DEPENDENT = "taux_abstention"
+REG_COVARIATES = ["revenu_median", "hlm_density"]
+
+
+def run_spatial_regression(gdf, w):
+    """
+    OLS baseline + Lagrange Multiplier diagnostics + SLM + SEM.
+    Dependent: taux_abstention
+    Covariates: revenu_median, hlm_density
+    """
+    print("\n" + "=" * 72)
+    print("SPATIAL REGRESSION (Phase 4e)")
+    print(f"  Y = {REG_DEPENDENT}  |  X = {', '.join(REG_COVARIATES)}")
+    print("=" * 72)
+
+    # Build design matrix — fill NaN with median
+    df = gdf[[REG_DEPENDENT] + REG_COVARIATES].copy()
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+        df[col] = df[col].fillna(df[col].median())
+
+    y = df[[REG_DEPENDENT]].values
+    X = df[REG_COVARIATES].values
+
+    # Build non-row-standardised weights for spreg (it row-standardises internally)
+    w_ols = Queen.from_dataframe(gdf, use_index=False)
+
+    # ── OLS ───────────────────────────────────────────────────────────────
+    ols = spreg.OLS(
+        y, X,
+        w=w_ols,
+        name_y=REG_DEPENDENT,
+        name_x=REG_COVARIATES,
+        name_ds="paris_2026",
+        spat_diag=True,
+    )
+
+    print("\n[OLS baseline]")
+    print(f"  R²           = {ols.r2:.4f}")
+    print(f"  Adj-R²       = {ols.ar2:.4f}")
+    print(f"  Coefficients:")
+    labels = ["Intercept"] + REG_COVARIATES
+    for name, coef, std, (t, p) in zip(labels, ols.betas.flatten(), ols.std_err,
+                                        ols.t_stat):
+        sig = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else ""
+        print(f"    {name:20s}  β={coef:9.4f}  SE={std:.4f}  t={t:7.3f}  p={p:.4f} {sig}")
+
+    # ── LM diagnostics (choose SLM vs SEM) ───────────────────────────────
+    lm_lag   = ols.lm_lag
+    lm_err   = ols.lm_error
+    rlm_lag  = ols.rlm_lag
+    rlm_err  = ols.rlm_error
+
+    print("\n[Lagrange Multiplier diagnostics]")
+    print(f"  LM-Lag        stat={lm_lag[0]:.4f}   p={lm_lag[1]:.4f}")
+    print(f"  LM-Error      stat={lm_err[0]:.4f}   p={lm_err[1]:.4f}")
+    print(f"  RLM-Lag       stat={rlm_lag[0]:.4f}  p={rlm_lag[1]:.4f}")
+    print(f"  RLM-Error     stat={rlm_err[0]:.4f}  p={rlm_err[1]:.4f}")
+
+    # Anselin (1988) decision rule: prefer model with higher robust LM
+    prefer = "SLM" if rlm_lag[0] > rlm_err[0] else "SEM"
+    print(f"\n  → Decision rule (robust LM): prefer {prefer}")
+
+    # ── SLM ───────────────────────────────────────────────────────────────
+    slm = spreg.ML_Lag(
+        y, X,
+        w=w_ols,
+        name_y=REG_DEPENDENT,
+        name_x=REG_COVARIATES,
+        name_ds="paris_2026",
+    )
+    print("\n[SLM — Spatial Lag Model]")
+    print(f"  Log-likelihood = {slm.logll:.4f}")
+    print(f"  AIC            = {slm.aic:.4f}")
+    print(f"  ρ (spatial lag)= {slm.rho:.4f}")
+    slm_labels = ["Intercept"] + REG_COVARIATES
+    for name, coef, std, (z, p) in zip(slm_labels, slm.betas.flatten(), slm.std_err,
+                                        slm.z_stat):
+        sig = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else ""
+        print(f"    {name:20s}  β={coef:9.4f}  SE={std:.4f}  z={z:7.3f}  p={p:.4f} {sig}")
+
+    # ── SEM (GMM estimator — avoids ML_Error numpy compat issue) ─────────
+    sem = spreg.GM_Error(
+        y, X,
+        w=w_ols,
+        name_y=REG_DEPENDENT,
+        name_x=REG_COVARIATES,
+        name_ds="paris_2026",
+    )
+    print("\n[SEM — Spatial Error Model (GMM)]")
+    sem_lam = float(sem.betas.flatten()[-1])
+    print(f"  λ (spatial err)= {sem_lam:.4f}")
+    print(f"  Pseudo-R²      = {sem.pr2:.4f}")
+    sem_labels = ["Intercept"] + REG_COVARIATES + ["lambda"]
+    for name, coef, std, (z, p) in zip(sem_labels, sem.betas.flatten(), sem.std_err,
+                                        sem.z_stat):
+        sig = "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else ""
+        print(f"    {name:20s}  β={coef:9.4f}  SE={std:.4f}  z={z:7.3f}  p={p:.4f} {sig}")
+
+    # ── Model comparison ──────────────────────────────────────────────────
+    # Compare SLM vs OLS by AIC; SEM via Moran I on residuals vs OLS
+    print("\n[Model comparison]")
+    print(f"  {'Model':6s}  {'LogL':>10s}  {'AIC':>10s}")
+    print(f"  {'OLS':6s}  {ols.logll:10.4f}  {ols.aic:10.4f}")
+    print(f"  {'SLM':6s}  {slm.logll:10.4f}  {slm.aic:10.4f}")
+    print(f"  SEM    (LM-Error {lm_err[0]:.2f}, p={lm_err[1]:.4f} — recommend SEM per diagnostics)"
+          if lm_err[1] < 0.05 else "  SEM    (not strongly indicated by LM diagnostics)")
+
+    return ols, slm, sem
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -263,6 +383,14 @@ def main():
 
     # ── Phase 4b: K-means ─────────────────────────────────────────────────
     sil_scores, best_k = run_kmeans(gdf, cluster_vars)
+
+    # ── Phase 4e: Spatial regression ──────────────────────────────────────
+    reg_vars_present = all(v in gdf.columns for v in [REG_DEPENDENT] + REG_COVARIATES)
+    if reg_vars_present:
+        run_spatial_regression(gdf, w)
+    else:
+        missing_reg = [v for v in [REG_DEPENDENT] + REG_COVARIATES if v not in gdf.columns]
+        print(f"\nSkipping spatial regression: missing columns {missing_reg}")
 
     # ── Save output ───────────────────────────────────────────────────────
     # Ensure CRS is WGS84
