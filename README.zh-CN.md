@@ -108,19 +108,13 @@ npm install
 
 ### 3. 下载原始数据
 
-将文件放入 `data/raw/`，并使用各脚本预期的**精确子目录名和文件名**：
+```bash
+bash scripts/download_data.sh            # 仅必要文件（巴黎视图）
+bash scripts/download_data.sh --idf      # + Admin-Express COG（~582 MB，法兰西岛视图）
+bash scripts/download_data.sh --optional # + 2020年结果 + RP2021人口普查（~530 MB）
+```
 
-| 期望路径 | 来源 | 是否必须 |
-|----------|------|----------|
-| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - 法国内政部 | 是 |
-| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr | 是 |
-| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | 是 |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS（IRIS 级） | 是 |
-| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — 脚本自动检测第一个 `CONTOURS-IRIS*` 目录中的 `.gpkg` 文件 | 是 |
-| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - 法国内政部 | 否 |
-| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 个人数据 | 否 |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS（市镇级） | 否（法兰西岛视图） |
-| `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG（市镇边界） | 否（法兰西岛视图） |
+脚本将自动下载并解压所有文件到 `data/raw/`。前提条件：`curl` 和 `7z`（Debian/Ubuntu：`sudo apt install p7zip-full`，macOS：`brew install p7zip`）。
 
 ### 4. 运行巴黎数据处理流程
 

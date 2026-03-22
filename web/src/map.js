@@ -276,6 +276,27 @@ function buildParisTooltip(props) {
       <span class="tip-label">LISA abst.</span>
       <span class="tip-val" style="color:${LISA_COLORS[props.lisa_taux_abstention] || '#888'}">${props.lisa_taux_abstention}</span>
     </div>` : ''}
+    ${props.pct_bac_plus != null && props.pct_bac_plus !== 'null' ? `
+    <div class="tip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
+      <span class="tip-label">Bac+2 et plus</span>
+      <span class="tip-val">${fmt(props.pct_bac_plus)} %</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-label">Cadres (CSP+)</span>
+      <span class="tip-val">${fmt(props.pct_cadres)} %</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-label">Ouvriers</span>
+      <span class="tip-val">${fmt(props.pct_ouvriers)} %</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-label">Seniors 65+</span>
+      <span class="tip-val">${fmt(props.pct_seniors)} %</span>
+    </div>
+    <div class="tip-row">
+      <span class="tip-label">Jeunes &lt;30</span>
+      <span class="tip-val">${fmt(props.pct_jeunes)} %</span>
+    </div>` : ''}
     ${props.taux_non_inscription != null && props.taux_non_inscription !== 'null' ? `
     <div class="tip-row" style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.08)">
       <span class="tip-label">Non-inscrits est.</span>

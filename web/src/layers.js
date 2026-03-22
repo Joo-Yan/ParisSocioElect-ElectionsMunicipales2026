@@ -20,6 +20,12 @@ export const COLORS = {
   // Non-registration / real non-participation: light yellow → dark orange/red
   non_inscription:     ['#fff7bc','#fee391','#fec44f','#fe9929','#cc4c02'],
   non_participation:   ['#fff7bc','#fee391','#fec44f','#fe9929','#cc4c02'],
+  // Demographic variables: education (teal), cadres (indigo), workers (brown), seniors (olive), youth (coral)
+  bac_plus:            ['#e0f4f1','#9dd8cc','#56bca8','#1e9080','#07614f'],
+  cadres:              ['#ede7f6','#b39ddb','#7e57c2','#512da8','#311b92'],
+  ouvriers:            ['#fbe9e7','#ffab91','#ff7043','#e64a19','#bf360c'],
+  seniors:             ['#f9fbe7','#dce775','#afb42b','#827717','#544800'],
+  jeunes:              ['#fce4ec','#f48fb1','#e91e63','#c2185b','#880e4f'],
 };
 
 export const IDF_COLORS = {
@@ -71,6 +77,12 @@ export const LAYER_META = {
   // Non-registration (Phase 4d)
   non_inscription:     { field: 'taux_non_inscription',        label: 'Non-inscrits estimés (%)',         shortLabel: 'Non-inscrits',      unit: '%', decimals: 1 },
   non_participation:   { field: 'taux_non_participation_reel', label: 'Non-participation réelle (%)',     shortLabel: 'Non-participation',  unit: '%', decimals: 1 },
+  // Demographic variables (RP2021)
+  bac_plus:  { field: 'pct_bac_plus',  label: 'Diplômés bac+2 ou plus (%)', shortLabel: 'Bac+2 et plus', unit: '%', decimals: 1 },
+  cadres:    { field: 'pct_cadres',    label: 'Cadres et prof. sup. (%)',    shortLabel: 'Cadres (CSP+)', unit: '%', decimals: 1 },
+  ouvriers:  { field: 'pct_ouvriers',  label: 'Ouvriers (%)',                shortLabel: 'Ouvriers',      unit: '%', decimals: 1 },
+  seniors:   { field: 'pct_seniors',   label: 'Seniors 65+ (%)',             shortLabel: 'Seniors 65+',   unit: '%', decimals: 1 },
+  jeunes:    { field: 'pct_jeunes',    label: 'Jeunes <30 ans (%)',          shortLabel: 'Jeunes <30',    unit: '%', decimals: 1 },
 };
 
 export const IDF_LAYER_META = {
@@ -123,6 +135,7 @@ export const VIEW_CONFIG = {
       { title: 'Analyse spatiale', keys: ['lisa_abstention','lisa_revenu','lisa_hlm','cluster'] },
       { title: 'Historique',       keys: ['abstention_2020','delta_abstention'] },
       { title: 'Non-participation', keys: ['non_inscription','non_participation'] },
+      { title: 'Démographie',      keys: ['bac_plus','cadres','ouvriers','seniors','jeunes'] },
     ],
     csvFields: [
       'code_bv', 'arrondissement', 'inscrits',
@@ -130,7 +143,8 @@ export const VIEW_CONFIG = {
       'pct_gregoire', 'pct_dati', 'pct_chikirou', 'pct_bournazel', 'pct_knafo', 'pct_autres',
       'lisa_taux_abstention', 'lisa_revenu_median', 'lisa_hlm_density', 'cluster_id',
       'taux_abstention_2020', 'delta_abstention',
-      'taux_non_inscription', 'taux_non_participation_reel'
+      'taux_non_inscription', 'taux_non_participation_reel',
+      'pct_bac_plus', 'pct_cadres', 'pct_ouvriers', 'pct_seniors', 'pct_jeunes'
     ],
     csvFilename: 'socioelect_paris_donnees.csv',
   },

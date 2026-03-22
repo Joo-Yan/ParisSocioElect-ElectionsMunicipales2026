@@ -6,7 +6,7 @@ Entrée  : data/raw/ (élections, RPLS COM, Filosofi IRIS, Admin-Express commune
 Sortie  : data/processed/idf_2026_t1.geojson + web/public/data/processed/idf_2026_t1.geojson
 
 Données nécessaires :
-  data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv
+  data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-20.csv
   data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv
   data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv
   data/raw/ADMIN-EXPRESS-COG/ (commune boundary GPKG — Admin-Express COG IGN)
@@ -26,7 +26,7 @@ WEB_PROCESSED = os.path.join("web", "public", "data", "processed")
 WEB_OUTPUT    = os.path.join(WEB_PROCESSED, "idf_2026_t1.geojson")
 
 ELECTIONS_CSV = os.path.join(RAW, "premier_tour_resultat",
-    "municipales-2026-resultats-bv-par-communes-2026-03-16.csv")
+    "municipales-2026-resultats-bv-par-communes-2026-03-20.csv")
 RPLS_COM_CSV  = os.path.join(RAW, "RPLS_01-01-2024_Iris",
     "data_RPLS2024_COM.csv")
 FILO_IRIS_CSV = os.path.join(RAW, "BASE_TD_FILO_IRIS_2021_DISP_CSV",

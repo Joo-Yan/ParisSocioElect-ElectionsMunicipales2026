@@ -108,19 +108,13 @@ npm install
 
 ### 3. Download raw data
 
-Place files in `data/raw/` with the **exact subdirectory names and filenames** expected by the scripts:
+```bash
+bash scripts/download_data.sh            # required files only (Paris view)
+bash scripts/download_data.sh --idf      # + Admin-Express COG (~582 MB, Île-de-France view)
+bash scripts/download_data.sh --optional # + 2020 results + RP2021 census (~530 MB)
+```
 
-| Expected path | Source | Required |
-|---------------|--------|----------|
-| `data/raw/premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv` | data.gouv.fr - Ministère de l'Intérieur | Yes |
-| `data/raw/bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson` | opendata.paris.fr | Yes |
-| `data/raw/BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv` | INSEE Filosofi | Yes |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_Iris.csv` | INSEE RPLS (IRIS) | Yes |
-| `data/raw/CONTOURS-IRIS-PE_.../.../*.gpkg` | INSEE / IGN — script auto-detects the `.gpkg` in the first `CONTOURS-IRIS*` folder | Yes |
-| `data/raw/premier_tour_resultat/municipales-2020-resultats-bv-t1-france.txt` | data.gouv.fr - Ministère de l'Intérieur | No |
-| `data/raw/RP2021_indcvi.parquet` | INSEE RP 2021 individuals file | No |
-| `data/raw/RPLS_01-01-2024_Iris/data_RPLS2024_COM.csv` | INSEE RPLS (commune) | No (IDF view) |
-| `data/raw/ADMIN-EXPRESS-COG/` | IGN Admin-Express COG (commune boundaries) | No (IDF view) |
+The script automatically downloads and extracts all files into `data/raw/`. Prerequisites: `curl` and `7z` (`sudo apt install p7zip-full` on Debian/Ubuntu, `brew install p7zip` on macOS).
 
 ### 4. Run the Paris pipeline
 

@@ -4,7 +4,7 @@ Entrée  : data/raw/ (fichiers originaux)
 Sortie  : data/processed/paris_2026_t1.geojson
 
 Données nécessaires dans data/raw/ :
-  premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-16.csv
+  premier_tour_resultat/municipales-2026-resultats-bv-par-communes-2026-03-20.csv
   bureaux_vote/secteurs-des-bureaux-de-vote-2026.geojson
   CONTOURS-IRIS-PE_.../contours-iris-pe.gpkg
   BASE_TD_FILO_IRIS_2021_DISP_CSV/BASE_TD_FILO_IRIS_2021_DISP.csv
@@ -25,7 +25,7 @@ WEB_PROCESSED = os.path.join("web", "public", "data", "processed")
 WEB_OUTPUT    = os.path.join(WEB_PROCESSED, "paris_2026_t1.geojson")
 
 ELECTIONS_CSV = os.path.join(RAW, "premier_tour_resultat",
-    "municipales-2026-resultats-bv-par-communes-2026-03-16.csv")
+    "municipales-2026-resultats-bv-par-communes-2026-03-20.csv")
 ELECTIONS_2020_TXT = os.path.join(RAW, "premier_tour_resultat",
     "municipales-2020-resultats-bv-t1-france.txt")
 RP2021_PARQUET  = os.path.join(RAW, "RP2021_indcvi.parquet")
@@ -265,22 +265,40 @@ def load_elections_2020():
 # 4d. Non-inscrits — population éligible (Français 18+) par IRIS, RP 2021
 # ══════════════════════════════════════════════════════════════════════════════
 
+_RP2021_DEMO_COLS = [
+    "CODE_IRIS", "pop_eligible_18_fr",
+    "pct_bac_plus", "pct_cadres", "pct_ouvriers", "pct_seniors", "pct_jeunes",
+]
+
+
 def load_rp2021_iris():
     """
-    Retourne un DataFrame {CODE_IRIS, pop_eligible_18_fr} depuis :
-      1. le CSV pré-calculé (si disponible, évite de relire le Parquet)
+    Retourne un DataFrame {CODE_IRIS, pop_eligible_18_fr,
+    pct_bac_plus, pct_cadres, pct_ouvriers, pct_seniors, pct_jeunes} depuis :
+      1. le CSV pré-calculé (si disponible et contient toutes les colonnes)
       2. le fichier Parquet RP2021 individus si nécessaire
     """
     if os.path.exists(RP2021_IRIS_CSV):
-        print("[4d] RP2021 IRIS eligible (CSV cache)…")
         df = pd.read_csv(RP2021_IRIS_CSV)
         df["CODE_IRIS"] = df["CODE_IRIS"].astype(str).str.strip()
-        print(f"  {len(df)} IRIS  |  pop_eligible_18_fr total = "
-              f"{df['pop_eligible_18_fr'].sum():,.0f}")
-        return df[["CODE_IRIS", "pop_eligible_18_fr"]]
+        if all(c in df.columns for c in _RP2021_DEMO_COLS):
+            print("[4d] RP2021 IRIS démo (CSV cache)…")
+            print(f"  {len(df)} IRIS  |  pop_eligible_18_fr total = "
+                  f"{df['pop_eligible_18_fr'].sum():,.0f}")
+            return df[_RP2021_DEMO_COLS]
+        missing = [c for c in _RP2021_DEMO_COLS if c not in df.columns]
+        print(f"[4d] Cache RP2021 incomplet (colonnes manquantes : {missing}) "
+              "— régénération depuis Parquet…")
 
     if not os.path.exists(RP2021_PARQUET):
-        print("[4d] Fichier RP2021 introuvable — skip non-inscrits")
+        if os.path.exists(RP2021_IRIS_CSV):
+            print("[4d] AVERTISSEMENT : cache RP2021 incomplet et parquet absent.")
+            print("       taux_non_inscription sera absent du GeoJSON.")
+            print("       Pour l'activer, télécharger le parquet puis relancer :")
+            print("         bash scripts/download_data.sh --optional")
+            print("         python scripts/process.py")
+        else:
+            print("[4d] RP2021 absent — skip non-inscrits (optionnel)")
         return None
 
     print("[4d] RP2021 individus (Parquet) — extraction Paris…")
@@ -292,24 +310,83 @@ def load_rp2021_iris():
 
     paris_df = pq.read_table(
         RP2021_PARQUET,
-        columns=["IRIS", "AGED", "INATC", "IPONDI"],
+        columns=["IRIS", "AGED", "INATC", "IPONDI", "DIPL", "CS1"],
         filters=[("DEPT", "=", "75")],
     ).to_pandas()
 
     paris_df["age_num"] = pd.to_numeric(paris_df["AGED"], errors="coerce")
     paris_df["weight"]  = pd.to_numeric(paris_df["IPONDI"], errors="coerce").fillna(0)
 
+    # ── population éligible (Français 18+) ───────────────────────────────────
     pop_total    = paris_df.groupby("IRIS")["weight"].sum().rename("pop_total")
     eligible     = paris_df[(paris_df["INATC"] == "1") & (paris_df["age_num"] >= 18)]
     pop_eligible = eligible.groupby("IRIS")["weight"].sum().rename("pop_eligible_18_fr")
 
     result = pd.concat([pop_total, pop_eligible], axis=1).reset_index()
     result.columns = ["CODE_IRIS", "pop_total", "pop_eligible_18_fr"]
-    result.to_csv(RP2021_IRIS_CSV, index=False)
+
+    # ── éducation : % adultes 18+ avec bac+2 ou plus (DIPL in {"5","6"}) ─────
+    adults = paris_df[paris_df["age_num"] >= 18].copy()
+    adults["dipl_str"] = adults["DIPL"].astype(str).str.strip()
+    adults_w = adults.groupby("IRIS")["weight"].sum().rename("w_adults")
+    # RP2021 DIPL codes: 16=bac+2 (BTS/DUT/DEUG), 17=licence/maîtrise,
+    #                    18=master/grande école/doctorat, 19=médecine/pharma
+    dipl_sup = (
+        adults[adults["dipl_str"].isin(["16", "17", "18", "19"])]
+        .groupby("IRIS")["weight"].sum().rename("w_bac_plus")
+    )
+    edu = pd.concat([adults_w, dipl_sup], axis=1).fillna(0)
+    edu["pct_bac_plus"] = (edu["w_bac_plus"] / edu["w_adults"] * 100).where(edu["w_adults"] > 0)
+    result = result.merge(edu[["pct_bac_plus"]].reset_index().rename(columns={"IRIS": "CODE_IRIS"}),
+                          on="CODE_IRIS", how="left")
+
+    # ── CSP : cadres (CS1="3") et ouvriers (CS1="6"), parmi actifs (CS1 1–6) ─
+    cs1_str = paris_df["CS1"].astype(str).str.strip()
+    active = paris_df[cs1_str.isin(["1", "2", "3", "4", "5", "6"])].copy()
+    active["cs1_str"] = active["CS1"].astype(str).str.strip()
+    active_w = active.groupby("IRIS")["weight"].sum().rename("w_active")
+    cadres_w = (
+        active[active["cs1_str"] == "3"]
+        .groupby("IRIS")["weight"].sum().rename("w_cadres")
+    )
+    ouvriers_w = (
+        active[active["cs1_str"] == "6"]
+        .groupby("IRIS")["weight"].sum().rename("w_ouvriers")
+    )
+    csp = pd.concat([active_w, cadres_w, ouvriers_w], axis=1).fillna(0)
+    csp["pct_cadres"]   = (csp["w_cadres"]   / csp["w_active"] * 100).where(csp["w_active"] > 0)
+    csp["pct_ouvriers"] = (csp["w_ouvriers"] / csp["w_active"] * 100).where(csp["w_active"] > 0)
+    result = result.merge(csp[["pct_cadres", "pct_ouvriers"]].reset_index().rename(
+                              columns={"IRIS": "CODE_IRIS"}),
+                          on="CODE_IRIS", how="left")
+
+    # ── âge : % 65+ et % <30 dans la population totale ───────────────────────
+    all_w = pop_total.rename("w_all")
+    seniors_w = (
+        paris_df[paris_df["age_num"] >= 65]
+        .groupby("IRIS")["weight"].sum().rename("w_seniors")
+    )
+    jeunes_w = (
+        paris_df[paris_df["age_num"] < 30]
+        .groupby("IRIS")["weight"].sum().rename("w_jeunes")
+    )
+    age = pd.concat([all_w, seniors_w, jeunes_w], axis=1).fillna(0)
+    age["pct_seniors"] = (age["w_seniors"] / age["w_all"] * 100).where(age["w_all"] > 0)
+    age["pct_jeunes"]  = (age["w_jeunes"]  / age["w_all"] * 100).where(age["w_all"] > 0)
+    result = result.merge(age[["pct_seniors", "pct_jeunes"]].reset_index().rename(
+                              columns={"IRIS": "CODE_IRIS"}),
+                          on="CODE_IRIS", how="left")
+
+    _tmp = RP2021_IRIS_CSV + ".tmp"
+    result.to_csv(_tmp, index=False)
+    os.replace(_tmp, RP2021_IRIS_CSV)
 
     print(f"  {len(result)} IRIS  |  pop_eligible_18_fr total = "
           f"{result['pop_eligible_18_fr'].sum():,.0f}")
-    return result[["CODE_IRIS", "pop_eligible_18_fr"]]
+    for col in ["pct_bac_plus", "pct_cadres", "pct_ouvriers", "pct_seniors", "pct_jeunes"]:
+        print(f"  {col}: med={result[col].median():.1f}%  "
+              f"min={result[col].min():.1f}%  max={result[col].max():.1f}%")
+    return result[_RP2021_DEMO_COLS]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -457,11 +534,13 @@ def main():
     hist_cols = ["taux_abstention_2020", "delta_abstention"] if df_elec_20 is not None else []
     nonins_cols = (["taux_non_inscription", "taux_non_participation_reel"]
                    if df_rp21 is not None else [])
+    demo_cols = (["pct_bac_plus", "pct_cadres", "pct_ouvriers", "pct_seniors", "pct_jeunes"]
+                 if df_rp21 is not None else [])
     keep = [
         "geometry", "join_key", "arrondissement_label",
         "inscrits", "abstentions", "taux_abstention",
         "revenu_median", "n_hlm", "hlm_density",
-    ] + pct_cols + hist_cols + nonins_cols
+    ] + pct_cols + hist_cols + nonins_cols + demo_cols
 
     keep = [c for c in keep if c in gdf.columns]
     gdf_out = gdf[keep].rename(columns={
